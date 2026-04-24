@@ -1835,25 +1835,36 @@ async function fetchRanking(period){
 }
 
 async function postScore(name,sc,wv){
-  const url=SUPABASE_URL+'/rest/v1/scores';
   const browserId=getBrowserId();
   try{
     // まず既存スコアを確認
-    const checkRes=await fetch(url+`?browser_id=eq.${browserId}&select=score`,{headers:SUPABASE_HEADERS});
+    const checkRes=await fetch(
+      SUPABASE_URL+'/rest/v1/scores?browser_id=eq.'+browserId+'&select=score',
+      {headers:SUPABASE_HEADERS}
+    );
     if(checkRes.ok){
       const existing=await checkRes.json();
-      if(existing.length>0&&existing[0].score>=sc){
-        // 既存スコアの方が高い→登録しない
-        return 'lower';
+      if(existing.length>0){
+        if(existing[0].score>=sc) return 'lower'; // 既存の方が高い
+        // UPDATEで上書き
+        const upRes=await fetch(
+          SUPABASE_URL+'/rest/v1/scores?browser_id=eq.'+browserId,
+          {
+            method:'PATCH',
+            headers:SUPABASE_HEADERS,
+            body:JSON.stringify({player_name:name,score:sc,wave:wv})
+          }
+        );
+        return upRes.ok?'ok':'error';
       }
     }
-    // upsert（新規 or スコア更新）
-    const res=await fetch(url,{
+    // 新規INSERT
+    const insRes=await fetch(SUPABASE_URL+'/rest/v1/scores',{
       method:'POST',
-      headers:{...SUPABASE_HEADERS,'Prefer':'resolution=merge-duplicates,return=representation'},
+      headers:SUPABASE_HEADERS,
       body:JSON.stringify({browser_id:browserId,player_name:name,score:sc,wave:wv})
     });
-    return res.ok?'ok':'error';
+    return insRes.ok?'ok':'error';
   }catch(e){return 'error';}
 }
 
