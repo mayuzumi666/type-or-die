@@ -1,0 +1,1959 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>Typing of the Dead</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Share+Tech+Mono&display=swap');
+
+*{margin:0;padding:0;box-sizing:border-box}
+
+body{background:#000;display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:'Share Tech Mono',monospace;}
+
+#wrap{
+  width:800px;height:560px;
+  background:#000;
+  border:3px solid #2aff5a;
+  border-radius:4px;
+  position:relative;overflow:hidden;
+  box-shadow:0 0 40px rgba(42,255,90,0.25),inset 0 0 60px rgba(0,0,0,0.8);
+}
+
+/* CRT scanlines */
+#wrap::before{
+  content:'';position:absolute;inset:0;z-index:100;pointer-events:none;
+  background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.07) 2px,rgba(0,0,0,0.07) 4px);
+}
+/* CRT vignette */
+#wrap::after{
+  content:'';position:absolute;inset:0;z-index:100;pointer-events:none;
+  background:radial-gradient(ellipse at center,transparent 60%,rgba(0,0,0,0.55) 100%);
+}
+
+#c{width:100%;height:100%;display:block}
+#shake{position:absolute;inset:0;border-radius:2px;pointer-events:none;z-index:4;border:0px solid #f00}
+#labels{position:absolute;inset:0;pointer-events:none;z-index:6}
+
+/* ── HUD ── */
+#hud{
+  position:absolute;top:0;left:0;right:0;
+  pointer-events:none;z-index:10;
+  display:flex;align-items:flex-start;
+  padding:8px 10px;gap:8px;
+  padding-right:90px;
+}
+
+/* SCORE block — leftmost, big TOTD style */
+#hud-score{
+  display:flex;flex-direction:column;
+  background:rgba(0,0,0,0.85);
+  border:2px solid #2aff5a;
+  padding:4px 12px 5px;
+  min-width:130px;
+  box-shadow:0 0 8px rgba(42,255,90,0.3);
+}
+#hud-score .lbl{font-family:'Press Start 2P',monospace;font-size:7px;color:#1a8a35;letter-spacing:1px;margin-bottom:3px}
+#hud-score .val{font-family:'Press Start 2P',monospace;font-size:16px;color:#2aff5a;letter-spacing:2px;text-shadow:0 0 10px rgba(42,255,90,0.8)}
+
+/* LIVES — heart icons */
+#hud-lives{
+  display:flex;flex-direction:column;
+  background:rgba(0,0,0,0.85);
+  border:2px solid #ff3333;
+  padding:4px 12px 5px;
+  box-shadow:0 0 8px rgba(255,51,51,0.3);
+}
+#hud-lives .lbl{font-family:'Press Start 2P',monospace;font-size:7px;color:#992222;letter-spacing:1px;margin-bottom:3px}
+#hud-lives .val{font-size:16px;color:#ff3333;text-shadow:0 0 8px rgba(255,51,51,0.6)}
+
+/* WAVE */
+#hud-wave{
+  display:flex;flex-direction:column;
+  background:rgba(0,0,0,0.85);
+  border:2px solid #ffcc00;
+  padding:4px 12px 5px;
+  box-shadow:0 0 8px rgba(255,204,0,0.3);
+}
+#hud-wave .lbl{font-family:'Press Start 2P',monospace;font-size:7px;color:#997700;letter-spacing:1px;margin-bottom:3px}
+#hud-wave .val{font-family:'Press Start 2P',monospace;font-size:16px;color:#ffcc00;text-shadow:0 0 10px rgba(255,204,0,0.7)}
+
+/* AMMO */
+#hud-ammo{
+  display:flex;flex-direction:column;
+  background:rgba(0,0,0,0.85);
+  border:2px solid #ff8c00;
+  padding:4px 12px 5px;
+  box-shadow:0 0 8px rgba(255,140,0,0.3);
+  margin-left:auto;
+}
+#hud-ammo .lbl{font-family:'Press Start 2P',monospace;font-size:7px;color:#994400;letter-spacing:1px;margin-bottom:3px}
+#hud-ammo .val{font-family:'Press Start 2P',monospace;font-size:13px;color:#ff8c00;text-shadow:0 0 10px rgba(255,140,0,0.7);letter-spacing:2px;line-height:1.4}
+
+/* BGM volume slider */
+#bgm-vol-wrap{
+  display:flex;flex-direction:column;
+  background:rgba(0,0,0,0.85);
+  border:2px solid #4a6a4a;
+  padding:4px 10px 5px;
+  box-shadow:0 0 8px rgba(42,255,90,0.15);
+}
+#bgm-vol-wrap .lbl{font-family:'Press Start 2P',monospace;font-size:6px;color:#3a6a3a;letter-spacing:1px;margin-bottom:4px}
+#bgm-slider{
+  -webkit-appearance:none;appearance:none;
+  width:72px;height:6px;
+  background:linear-gradient(to right,#2aff5a 0%,#2aff5a 50%,#0a2a0a 50%,#0a2a0a 100%);
+  border-radius:3px;outline:none;cursor:pointer;
+}
+#bgm-slider::-webkit-slider-thumb{
+  -webkit-appearance:none;appearance:none;
+  width:12px;height:14px;border-radius:2px;
+  background:#2aff5a;cursor:pointer;
+  box-shadow:0 0 6px rgba(42,255,90,0.6);
+}
+#bgm-slider::-moz-range-thumb{
+  width:12px;height:14px;border-radius:2px;border:none;
+  background:#2aff5a;cursor:pointer;
+}
+#bottom{
+  position:absolute;bottom:0;left:0;right:0;
+  z-index:8;
+  display:flex;flex-direction:column;align-items:center;
+  padding-bottom:10px;
+}
+
+/* weapon/reload info bar */
+#weapon-bar{
+  width:90%;max-width:540px;
+  display:flex;align-items:center;justify-content:space-between;
+  background:rgba(0,0,0,0.9);
+  border:1px solid #333;
+  border-bottom:none;
+  padding:4px 14px;
+  border-radius:3px 3px 0 0;
+}
+#weapon-name{font-family:'Press Start 2P',monospace;font-size:8px;color:#888;letter-spacing:1px}
+#ammo-bar{display:flex;gap:3px;align-items:center}
+.ammo-pip{
+  width:8px;height:14px;
+  background:#ff8c00;
+  border-radius:2px 2px 1px 1px;
+  box-shadow:0 0 4px rgba(255,140,0,0.5);
+  transition:all 0.1s;
+}
+.ammo-pip.empty{background:#222;box-shadow:none;border:1px solid #333}
+
+/* main input */
+#input-wrap{
+  width:90%;max-width:540px;
+  background:rgba(0,0,0,0.95);
+  border:2px solid #2aff5a;
+  border-radius:0 0 3px 3px;
+  padding:0;
+  display:flex;align-items:center;
+  overflow:hidden;
+  transition:border-color 0.1s;
+  box-shadow:0 0 15px rgba(42,255,90,0.2);
+}
+#input-wrap.reload-mode{
+  border-color:#ff8c00;
+  box-shadow:0 0 15px rgba(255,140,0,0.4);
+  animation:reload-pulse 0.8s ease-in-out infinite alternate;
+}
+@keyframes reload-pulse{
+  from{box-shadow:0 0 8px rgba(255,140,0,0.3)}
+  to{box-shadow:0 0 25px rgba(255,140,0,0.7)}
+}
+#input-wrap.err-mode{border-color:#ff2222}
+
+/* mode indicator badge */
+#mode-badge{
+  font-family:'Press Start 2P',monospace;
+  font-size:7px;
+  padding:0 10px;
+  align-self:stretch;
+  display:flex;align-items:center;
+  white-space:nowrap;
+  background:rgba(42,255,90,0.12);
+  color:#2aff5a;
+  border-right:2px solid #2aff5a;
+  transition:all 0.15s;
+  min-width:56px;justify-content:center;
+}
+#input-wrap.reload-mode #mode-badge{
+  background:rgba(255,140,0,0.15);
+  color:#ff8c00;
+  border-right-color:#ff8c00;
+}
+
+#ti{
+  flex:1;
+  background:transparent;
+  border:none;
+  padding:10px 14px;
+  color:#2aff5a;
+  font-size:22px;
+  font-family:'Share Tech Mono',monospace;
+  outline:none;
+  text-align:center;
+  caret-color:#2aff5a;
+  letter-spacing:2px;
+}
+#input-wrap.reload-mode #ti{color:#ff8c00;caret-color:#ff8c00}
+#ti::placeholder{color:#1a5a2a;letter-spacing:1px;font-size:13px}
+#input-wrap.reload-mode #ti::placeholder{color:#7a4000}
+
+/* TAB hint */
+#tab-hint{
+  font-family:'Press Start 2P',monospace;font-size:7px;color:#333;
+  margin-top:4px;letter-spacing:0.5px;
+  transition:color 0.2s;
+}
+#tab-hint.active{color:#ff8c00}
+
+/* ── OVERLAY ── */
+#ov{
+  position:absolute;inset:0;
+  background:rgba(0,0,0,0.93);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  z-index:20;gap:12px;
+}
+#ov h1{
+  font-family:'Press Start 2P',monospace;
+  font-size:20px;color:#2aff5a;
+  letter-spacing:3px;
+  text-shadow:0 0 20px rgba(42,255,90,0.8),0 0 40px rgba(42,255,90,0.4);
+  margin-bottom:4px;
+  animation:flicker 4s infinite;
+}
+@keyframes flicker{
+  0%,95%,97%,100%{opacity:1}
+  96%{opacity:0.6}
+}
+#ov .sub{font-family:'Press Start 2P',monospace;font-size:8px;color:#1a6a30;letter-spacing:2px;margin-bottom:8px}
+#ov p{font-family:'Share Tech Mono',monospace;font-size:13px;color:#4a7a4a;text-align:center;line-height:1.8}
+#ov .sc{
+  font-family:'Press Start 2P',monospace;font-size:18px;color:#ffcc00;
+  text-shadow:0 0 10px rgba(255,204,0,0.7);
+  margin:6px 0;
+}
+#ov button{
+  font-family:'Press Start 2P',monospace;font-size:10px;
+  padding:12px 28px;
+  background:transparent;
+  border:2px solid #2aff5a;
+  border-radius:2px;color:#2aff5a;cursor:pointer;
+  margin-top:6px;letter-spacing:2px;
+  box-shadow:0 0 10px rgba(42,255,90,0.2);
+  transition:all 0.15s;
+  animation:blink-btn 1.2s step-end infinite;
+}
+@keyframes blink-btn{50%{border-color:#1a5a2a;color:#1a5a2a;box-shadow:none}}
+#ov button:hover{
+  background:rgba(42,255,90,0.1);
+  box-shadow:0 0 20px rgba(42,255,90,0.5);
+  animation:none;
+  border-color:#2aff5a;color:#2aff5a;
+}
+#ov.gameover h1{color:#ff3333;text-shadow:0 0 20px rgba(255,51,51,0.8),0 0 40px rgba(255,51,51,0.4)}
+#ov.gameover button{border-color:#ff3333;color:#ff3333;box-shadow:0 0 10px rgba(255,51,51,0.2)}
+#ov.gameover button:hover{background:rgba(255,51,51,0.1);box-shadow:0 0 20px rgba(255,51,51,0.5)}
+
+/* Reload overlay flash */
+#reload-flash{
+  position:absolute;inset:0;pointer-events:none;z-index:7;
+  background:rgba(255,140,0,0);
+  transition:background 0.1s;
+}
+#reload-flash.active{background:rgba(255,140,0,0.12)}
+
+/* ── PAUSE MENU ── */
+#pause-menu{
+  position:absolute;inset:0;
+  background:rgba(0,0,0,0.88);
+  display:none;flex-direction:column;align-items:center;justify-content:center;
+  z-index:50;gap:0;
+  backdrop-filter:blur(2px);
+}
+#pause-menu h2{
+  font-family:'Press Start 2P',monospace;
+  font-size:22px;color:#2aff5a;letter-spacing:4px;
+  text-shadow:0 0 20px rgba(42,255,90,0.8),0 0 40px rgba(42,255,90,0.3);
+  margin-bottom:6px;
+  animation:flicker 4s infinite;
+}
+#pause-menu .pause-sub{
+  font-family:'Press Start 2P',monospace;font-size:7px;
+  color:#1a5a2a;letter-spacing:2px;margin-bottom:28px;
+}
+.pmenu-btn{
+  font-family:'Press Start 2P',monospace;font-size:10px;
+  padding:13px 36px;background:transparent;
+  border:2px solid #2aff5a;border-radius:2px;
+  color:#2aff5a;cursor:pointer;letter-spacing:2px;
+  box-shadow:0 0 8px rgba(42,255,90,0.2);
+  transition:all 0.15s;margin:5px 0;min-width:240px;
+}
+.pmenu-btn:hover{
+  background:rgba(42,255,90,0.1);
+  box-shadow:0 0 20px rgba(42,255,90,0.5);
+  transform:scale(1.03);
+}
+.pmenu-btn.danger{
+  border-color:#ff4444;color:#ff4444;
+  box-shadow:0 0 8px rgba(255,68,68,0.2);
+}
+.pmenu-btn.danger:hover{
+  background:rgba(255,68,68,0.1);
+  box-shadow:0 0 20px rgba(255,68,68,0.5);
+}
+.pmenu-btn.warn{
+  border-color:#ffcc00;color:#ffcc00;
+  box-shadow:0 0 8px rgba(255,204,0,0.2);
+}
+.pmenu-btn.warn:hover{
+  background:rgba(255,204,0,0.1);
+  box-shadow:0 0 20px rgba(255,204,0,0.5);
+}
+#pause-esc-hint{
+  font-family:'Press Start 2P',monospace;font-size:6px;
+  color:#1a3a1a;letter-spacing:1px;margin-top:18px;
+}
+
+/* PAUSE button (top-right corner) */
+#pause-btn{
+  position:absolute;top:8px;right:8px;
+  font-family:'Press Start 2P',monospace;font-size:7px;
+  padding:5px 10px;background:rgba(0,0,0,0.7);
+  border:1px solid #1a4a1a;border-radius:2px;
+  color:#1a6a1a;cursor:pointer;letter-spacing:1px;
+  z-index:15;pointer-events:auto;
+  transition:all 0.15s;
+}
+#pause-btn:hover{border-color:#2aff5a;color:#2aff5a;background:rgba(0,30,0,0.8);}
+#pause-btn.hidden{display:none;}
+
+/* ── RANKING PANEL ── */
+#ranking-panel {
+  position:absolute;inset:0;
+  background:rgba(0,0,0,0.97);
+  display:none;flex-direction:column;align-items:center;
+  z-index:25;overflow-y:auto;padding:20px 10px;
+}
+#ranking-panel h2{
+  font-family:'Press Start 2P',monospace;font-size:14px;
+  color:#2aff5a;letter-spacing:3px;margin-bottom:4px;
+  text-shadow:0 0 15px rgba(42,255,90,0.7);
+}
+.rank-tabs{display:flex;gap:0;margin:12px 0 8px;}
+.rank-tab{
+  font-family:'Press Start 2P',monospace;font-size:8px;
+  padding:7px 16px;cursor:pointer;letter-spacing:1px;
+  background:rgba(0,0,0,0.8);color:#2a5a2a;
+  border:2px solid #2a5a2a;transition:all 0.15s;
+}
+.rank-tab:first-child{border-radius:3px 0 0 3px;}
+.rank-tab:last-child{border-radius:0 3px 3px 0;}
+.rank-tab.active{background:rgba(42,255,90,0.12);color:#2aff5a;border-color:#2aff5a;}
+.rank-tab:not(:last-child){border-right:none;}
+#rank-table{width:100%;max-width:640px;border-collapse:collapse;margin-top:4px;}
+#rank-table th{
+  font-family:'Press Start 2P',monospace;font-size:7px;
+  color:#1a5a2a;padding:6px 8px;border-bottom:2px solid #1a3a1a;
+  text-align:left;letter-spacing:1px;
+}
+#rank-table td{
+  font-family:'Share Tech Mono',monospace;font-size:13px;
+  color:#4a8a4a;padding:6px 8px;border-bottom:1px solid #0a1a0a;
+}
+#rank-table tr.me td{color:#2aff5a;background:rgba(42,255,90,0.07);}
+#rank-table tr:nth-child(1) td{color:#ffcc00;}
+#rank-table tr:nth-child(2) td{color:#aaaaaa;}
+#rank-table tr:nth-child(3) td{color:#cd7f32;}
+.rank-medal{font-size:16px;margin-right:4px;}
+.rank-close-btn{
+  font-family:'Press Start 2P',monospace;font-size:9px;
+  padding:10px 24px;background:transparent;
+  border:2px solid #2aff5a;color:#2aff5a;cursor:pointer;
+  margin-top:16px;letter-spacing:2px;border-radius:2px;
+  transition:all 0.15s;
+}
+.rank-close-btn:hover{background:rgba(42,255,90,0.1);}
+#rank-status{font-family:'Share Tech Mono',monospace;font-size:12px;color:#2a5a2a;margin:6px 0;}
+#rank-btn{
+  font-family:'Press Start 2P',monospace;font-size:8px;
+  padding:8px 18px;background:transparent;
+  border:2px solid #ffcc00;color:#ffcc00;cursor:pointer;
+  letter-spacing:1px;border-radius:2px;margin-top:6px;
+  transition:all 0.15s;
+}
+#rank-btn:hover{background:rgba(255,204,0,0.1);}
+
+/* ── NAME INPUT MODAL ── */
+#name-modal{
+  position:absolute;inset:0;background:rgba(0,0,0,0.97);
+  display:none;flex-direction:column;align-items:center;justify-content:center;
+  z-index:30;gap:10px;
+}
+#name-modal h2{font-family:'Press Start 2P',monospace;font-size:13px;color:#2aff5a;letter-spacing:2px;}
+#name-modal p{font-family:'Share Tech Mono',monospace;font-size:13px;color:#4a8a4a;}
+#name-modal .sc{font-family:'Press Start 2P',monospace;font-size:16px;color:#ffcc00;text-shadow:0 0 8px rgba(255,204,0,0.6);}
+#player-name-input{
+  font-family:'Share Tech Mono',monospace;font-size:18px;
+  background:rgba(0,0,0,0.9);border:2px solid #2aff5a;
+  color:#2aff5a;padding:10px 18px;text-align:center;
+  letter-spacing:3px;outline:none;width:280px;margin-top:4px;
+  caret-color:#2aff5a;
+}
+#name-modal .submit-btn{
+  font-family:'Press Start 2P',monospace;font-size:9px;
+  padding:10px 26px;background:transparent;
+  border:2px solid #2aff5a;color:#2aff5a;cursor:pointer;
+  letter-spacing:2px;border-radius:2px;margin-top:4px;
+  transition:all 0.15s;
+}
+#name-modal .submit-btn:hover{background:rgba(42,255,90,0.1);}
+#name-modal .skip-btn{
+  font-family:'Press Start 2P',monospace;font-size:7px;
+  color:#2a4a2a;cursor:pointer;letter-spacing:1px;
+  background:none;border:none;margin-top:2px;
+}
+#name-modal .skip-btn:hover{color:#4a7a4a;}
+</style>
+</head>
+<body>
+<div id="wrap">
+  <canvas id="c"></canvas>
+  <div id="shake"></div>
+  <div id="reload-flash"></div>
+  <div id="labels"></div>
+
+  <!-- Pause Button -->
+  <button id="pause-btn" class="hidden" onclick="togglePause()">⏸ PAUSE</button>
+
+  <!-- Pause Menu -->
+  <div id="pause-menu">
+    <h2>PAUSED</h2>
+    <div class="pause-sub">— GAME SUSPENDED —</div>
+    <button class="pmenu-btn" onclick="togglePause()">▶ RESUME</button>
+    <button class="pmenu-btn warn" onclick="confirmRestart()">↺ RESTART</button>
+    <button class="pmenu-btn danger" onclick="goMainMenu()">⌂ MAIN MENU</button>
+    <div id="pause-esc-hint">[ ESC ] to resume</div>
+  </div>
+
+  <!-- HUD -->
+  <div id="hud">
+    <div id="hud-score">
+      <div class="lbl">SCORE</div>
+      <div class="val" id="sv">000000</div>
+    </div>
+    <div id="hud-lives">
+      <div class="lbl">LIFE</div>
+      <div class="val" id="lv">♥♥♥</div>
+    </div>
+    <div id="hud-wave">
+      <div class="lbl">WAVE</div>
+      <div class="val" id="wv">1</div>
+    </div>
+    <div id="hud-ammo">
+      <div class="lbl">AMMO</div>
+      <div class="val" id="av">■■■■■■■■■■</div>
+    </div>
+    <div id="bgm-vol-wrap">
+      <div class="lbl">♪ BGM</div>
+      <input id="bgm-slider" type="range" min="0" max="100" value="50" oninput="setBGMVolume(this.value)">
+    </div>
+  </div>
+
+  <!-- Bottom Input -->
+  <div id="bottom">
+    <div id="weapon-bar">
+      <span id="weapon-name">AUTO PISTOL</span>
+      <div id="ammo-bar"></div>
+    </div>
+    <div id="input-wrap">
+      <div id="mode-badge">FIRE</div>
+      <input id="ti" type="text" placeholder="TYPE TO SHOOT" autocomplete="off" spellcheck="false"/>
+    </div>
+    <div id="tab-hint">[TAB] = RELOAD MODE</div>
+  </div>
+
+  <!-- Overlay -->
+  <div id="ov">
+    <h1>TYPING OF<br>THE DEAD</h1>
+    <div class="sub">— ARCADE EDITION —</div>
+    <p>ゾンビが迫ってくる！単語をタイプして倒せ！</p>
+    <p style="color:#2a5a2a;font-size:11px">TABキー → リロードモード　"reload"と入力でリロード</p>
+    <button onclick="startGame()">▶ START GAME</button>
+    <button id="rank-btn-start" onclick="openRanking()" style="font-family:'Press Start 2P',monospace;font-size:8px;padding:8px 20px;background:transparent;border:2px solid #ffcc00;color:#ffcc00;cursor:pointer;letter-spacing:1px;border-radius:2px;margin-top:2px;transition:all 0.15s;" onmouseover="this.style.background='rgba(255,204,0,0.1)'" onmouseout="this.style.background='transparent'">🏆 RANKING</button>
+  </div>
+
+  <!-- Ranking Panel -->
+  <div id="ranking-panel">
+    <h2>🏆 RANKING</h2>
+    <div id="rank-status"></div>
+    <div class="rank-tabs">
+      <div class="rank-tab active" onclick="switchTab('all')">TOTAL</div>
+      <div class="rank-tab" onclick="switchTab('monthly')">MONTHLY</div>
+      <div class="rank-tab" onclick="switchTab('weekly')">WEEKLY</div>
+    </div>
+    <table id="rank-table">
+      <thead><tr><th>#</th><th>PLAYER</th><th>SCORE</th><th>WAVE</th><th>DATE</th></tr></thead>
+      <tbody id="rank-body"></tbody>
+    </table>
+    <button class="rank-close-btn" onclick="closeRanking()">▶ CLOSE</button>
+  </div>
+
+  <!-- Name Input Modal -->
+  <div id="name-modal">
+    <h2>NEW RECORD!</h2>
+    <p>名前を入力してランキング登録</p>
+    <div class="sc" id="nm-score"></div>
+    <input id="player-name-input" type="text" maxlength="12" placeholder="YOUR NAME" autocomplete="off" spellcheck="false"/>
+    <button class="submit-btn" onclick="submitScore()">▶ REGISTER</button>
+    <button class="skip-btn" onclick="skipRanking()">skip (登録しない)</button>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+// ─── CONSTANTS ───
+const WORDS=['zombie','brain','skull','blood','grave','curse','haunt','terror','plague','horror','ghoul','undead','creep','decay','fiend','shadow','carnage','dread','lurk','stalk','howl','feast','claw','rot','bite','moan','rage','doom','void','dark','flesh','groan','snarl','risen','feral','foul','wrath','tomb','bane','vile'];
+const WZCOUNT=[3,5,7,9,12];
+const MAX_AMMO=20;
+
+// ─── STATE ───
+let scene,camera,renderer,clock;
+let zombies=[],bullets=[],items=[],score=0,lives=3,wave=1,target=null;
+let running=false,paused=false,waveClearing=false,spawnsLeft=0,nextSpawnTime=0,nextItemTime=0;
+let ammo=MAX_AMMO,reloadMode=false,reloadTyped='';
+let audioCtx=null;
+
+// ─── AUDIO ───
+function getAudio(){if(!audioCtx)audioCtx=new(window.AudioContext||window.webkitAudioContext)();return audioCtx;}
+
+function playGunshot(){
+  try{
+    const ctx=getAudio();
+    const now=ctx.currentTime;
+    const sr=ctx.sampleRate;
+
+    // ── 1. ノイズバースト（爆発的な炸薬音）──
+    const burstDur=0.08;
+    const burstBuf=ctx.createBuffer(1,Math.ceil(sr*burstDur),sr);
+    const bd=burstBuf.getChannelData(0);
+    for(let i=0;i<bd.length;i++){
+      const t=i/sr;
+      // 急激な立ち上がり、指数減衰
+      const env=Math.exp(-t*80);
+      bd[i]=(Math.random()*2-1)*env*2.0;
+    }
+    const burstSrc=ctx.createBufferSource();burstSrc.buffer=burstBuf;
+    // ローパスで銃口っぽい丸みを出す
+    const burstLP=ctx.createBiquadFilter();burstLP.type='lowpass';burstLP.frequency.value=3500;burstLP.Q.value=0.8;
+    const burstG=ctx.createGain();burstG.gain.value=2.2;
+    burstSrc.connect(burstLP);burstLP.connect(burstG);burstG.connect(ctx.destination);
+    burstSrc.start(now);
+
+    // ── 2. 低音ボディ（チャンバー圧力）──
+    const bodyOsc=ctx.createOscillator();
+    bodyOsc.type='sine';
+    bodyOsc.frequency.setValueAtTime(80,now);
+    bodyOsc.frequency.exponentialRampToValueAtTime(30,now+0.12);
+    const bodyG=ctx.createGain();
+    bodyG.gain.setValueAtTime(1.8,now);
+    bodyG.gain.exponentialRampToValueAtTime(0.001,now+0.18);
+    bodyOsc.connect(bodyG);bodyG.connect(ctx.destination);
+    bodyOsc.start(now);bodyOsc.stop(now+0.22);
+
+  }catch(e){}
+}
+
+function playHit(){
+  // ゾンビにかじられた音：ガリッ→うめき声風
+  try{
+    const ctx=getAudio();
+    const now=ctx.currentTime;
+
+    // 1. ガリッ：骨を噛む低いクランチノイズ
+    const crunchDur=0.18;
+    const crunchBuf=ctx.createBuffer(1,Math.ceil(ctx.sampleRate*crunchDur),ctx.sampleRate);
+    const cd=crunchBuf.getChannelData(0);
+    for(let i=0;i<cd.length;i++){
+      const t=i/ctx.sampleRate;
+      const env=Math.pow(1-t/crunchDur,1.5);
+      // ざらついたノイズ＋低音トーンで肉を噛む感じ
+      cd[i]=((Math.random()*2-1)*0.7+(Math.random()>0.92?1:-1)*0.5)*env;
+    }
+    const crunchSrc=ctx.createBufferSource();crunchSrc.buffer=crunchBuf;
+    const crunchFilt=ctx.createBiquadFilter();
+    crunchFilt.type='lowpass';crunchFilt.frequency.value=900;crunchFilt.Q.value=3;
+    const crunchGain=ctx.createGain();crunchGain.gain.value=0.8;
+    crunchSrc.connect(crunchFilt);crunchFilt.connect(crunchGain);crunchGain.connect(ctx.destination);
+    crunchSrc.start(now);
+
+    // 2. ゾンビのうめき（低いうなり）
+    const groanOsc=ctx.createOscillator();
+    groanOsc.type='sawtooth';
+    groanOsc.frequency.setValueAtTime(90,now+0.05);
+    groanOsc.frequency.linearRampToValueAtTime(60,now+0.35);
+    const groanGain=ctx.createGain();
+    groanGain.gain.setValueAtTime(0,now+0.05);
+    groanGain.gain.linearRampToValueAtTime(0.18,now+0.1);
+    groanGain.gain.exponentialRampToValueAtTime(0.001,now+0.4);
+    const groanFilt=ctx.createBiquadFilter();
+    groanFilt.type='bandpass';groanFilt.frequency.value=200;groanFilt.Q.value=2;
+    groanOsc.connect(groanFilt);groanFilt.connect(groanGain);groanGain.connect(ctx.destination);
+    groanOsc.start(now+0.05);groanOsc.stop(now+0.45);
+
+    // 3. ダメージ衝撃音（ドスッ）
+    const impBuf=ctx.createBuffer(1,Math.ceil(ctx.sampleRate*0.08),ctx.sampleRate);
+    const id=impBuf.getChannelData(0);
+    for(let i=0;i<id.length;i++){
+      const t=i/ctx.sampleRate;
+      id[i]=(Math.random()*2-1)*Math.exp(-t*60)*0.9;
+    }
+    const impSrc=ctx.createBufferSource();impSrc.buffer=impBuf;
+    const impFilt=ctx.createBiquadFilter();impFilt.type='lowpass';impFilt.frequency.value=300;
+    const impGain=ctx.createGain();impGain.gain.value=0.6;
+    impSrc.connect(impFilt);impFilt.connect(impGain);impGain.connect(ctx.destination);
+    impSrc.start(now);
+  }catch(e){}
+}
+
+function playReload(){
+  try{
+    const ctx=getAudio();
+    // click-clack reload sound
+    [0,0.06,0.12,0.22].forEach(delay=>{
+      const buf=ctx.createBuffer(1,ctx.sampleRate*0.05,ctx.sampleRate);
+      const d=buf.getChannelData(0);
+      for(let i=0;i<d.length;i++){
+        const t=i/ctx.sampleRate;
+        d[i]=(Math.random()*2-1)*Math.exp(-t*120)*0.6+Math.sin(2*Math.PI*900*t)*Math.exp(-t*60)*0.3;
+      }
+      const src=ctx.createBufferSource();src.buffer=buf;
+      const g=ctx.createGain();g.gain.value=0.5;
+      src.connect(g);g.connect(ctx.destination);src.start(ctx.currentTime+delay);
+    });
+  }catch(e){}
+}
+
+function playEmpty(){
+  // カチカチカチ — 3連続の乾いた空撃ち音
+  try{
+    const ctx=getAudio();
+    const clickCount=3;
+    const clickGap=0.07; // 70ms間隔
+
+    for(let c=0;c<clickCount;c++){
+      const startTime=ctx.currentTime+c*clickGap;
+      const dur=0.03;
+      const buf=ctx.createBuffer(1,Math.ceil(ctx.sampleRate*dur),ctx.sampleRate);
+      const d=buf.getChannelData(0);
+      for(let i=0;i<d.length;i++){
+        const t=i/ctx.sampleRate;
+        // 金属的なクリック音：高周波ノイズ + トーン、急速に減衰
+        const env=Math.exp(-t*300);
+        const tone=Math.sin(2*Math.PI*3200*t)*0.4+Math.sin(2*Math.PI*1800*t)*0.3;
+        const noise=(Math.random()*2-1)*0.5;
+        d[i]=(tone+noise)*env;
+      }
+      const src=ctx.createBufferSource();src.buffer=buf;
+      const g=ctx.createGain();
+      // 後ろになるほど少し小さく（ガス欠感）
+      g.gain.value=0.7-c*0.15;
+      const hp=ctx.createBiquadFilter();
+      hp.type='highpass';hp.frequency.value=1200;
+      src.connect(hp);hp.connect(g);g.connect(ctx.destination);
+      src.start(startTime);
+    }
+  }catch(e){}
+}
+
+
+// ─── HEAL SOUND ───
+function playHeal(){
+  try{
+    const ctx=getAudio();
+    [[523,0],[659,0.1],[784,0.2],[1047,0.35]].forEach(([freq,delay])=>{
+      const dur=0.4;
+      const buf=ctx.createBuffer(1,Math.ceil(ctx.sampleRate*dur),ctx.sampleRate);
+      const d=buf.getChannelData(0);
+      for(let i=0;i<d.length;i++){
+        const t=i/ctx.sampleRate;
+        const env=Math.exp(-t*5)*Math.sin(Math.PI*t/dur);
+        d[i]=Math.sin(2*Math.PI*freq*t)*env*0.35;
+      }
+      const src=ctx.createBufferSource();src.buffer=buf;
+      const g=ctx.createGain();g.gain.value=1;
+      src.connect(g);g.connect(ctx.destination);
+      src.start(ctx.currentTime+delay);
+    });
+  }catch(e){}
+}
+
+// ─── ITEM (HEART) ───
+function makeHeartModel(){
+  const g=new THREE.Group();
+  const mat=new THREE.MeshLambertMaterial({color:0xff2255,emissive:0x660011});
+  const s1=new THREE.Mesh(new THREE.SphereGeometry(0.18,8,8),mat);s1.position.set(-0.13,0.12,0);g.add(s1);
+  const s2=new THREE.Mesh(new THREE.SphereGeometry(0.18,8,8),mat);s2.position.set(0.13,0.12,0);g.add(s2);
+  const body=new THREE.Mesh(new THREE.ConeGeometry(0.26,0.38,4),mat);
+  body.rotation.z=Math.PI;body.position.set(0,-0.06,0);g.add(body);
+  const ringMat=new THREE.MeshBasicMaterial({color:0xff88aa,transparent:true,opacity:0.6,wireframe:true});
+  const ring=new THREE.Mesh(new THREE.TorusGeometry(0.38,0.04,6,12),ringMat);g.add(ring);
+  // ポイントライト（赤い発光）
+  const pl=new THREE.PointLight(0xff2255,1.5,2.5);g.add(pl);
+  g.userData={ring};
+  return g;
+}
+
+function spawnItem(){
+  if(lives>=3)return;
+  const word='medkit';
+  const mesh=makeHeartModel();
+  const fromRight=Math.random()>0.5;
+  const startX=fromRight?10:-10;
+  const endX=fromRight?-12:12;
+  const zPos=-7-Math.random()*5;
+  mesh.position.set(startX,1.2,zPos);
+  scene.add(mesh);
+  const speed=(fromRight?-1:1)*0.022;
+  const item={mesh,word,typed:'',speed,alive:true,phase:Math.random()*Math.PI*2,endX,isItem:true};
+  items.push(item);
+}
+
+function updateItems(elapsed){
+  for(let i=items.length-1;i>=0;i--){
+    const it=items[i];
+    if(!it.alive)continue;
+    it.mesh.position.x+=it.speed;
+    it.phase+=0.06;
+    it.mesh.rotation.y+=0.05;
+    it.mesh.position.y=1.2+Math.sin(it.phase)*0.18;
+    if(it.mesh.userData.ring){
+      const s=1+Math.sin(it.phase*2)*0.25;
+      it.mesh.userData.ring.scale.set(s,s,s);
+    }
+    const gone=(it.speed<0&&it.mesh.position.x<it.endX)||(it.speed>0&&it.mesh.position.x>it.endX);
+    if(gone){
+      it.alive=false;scene.remove(it.mesh);
+      if(target===it)setTarget(getClosest());
+    }
+  }
+  if(running&&elapsed>=nextItemTime){
+    nextItemTime=elapsed+15+Math.random()*10;
+    if(lives<3)spawnItem();
+  }
+}
+
+
+// ─── BGM ───
+let bgmNodes=[];let bgmCtx=null;let bgmRunning=false;
+let bgmMasterGain=null;
+let bgmVolume=0.5; // デフォルト音量
+
+function stopBGM(){
+  bgmRunning=false;
+  bgmNodes.forEach(n=>{try{n.stop();}catch(e){}});
+  bgmNodes=[];
+}
+
+function startBGM(){
+  if(bgmRunning)return;
+  bgmRunning=true;
+  bgmCtx=getAudio();
+  // マスターゲイン（音量スライダー用）
+  if(!bgmMasterGain){
+    bgmMasterGain=bgmCtx.createGain();
+    bgmMasterGain.gain.value=bgmVolume;
+    bgmMasterGain.connect(bgmCtx.destination);
+  }
+  scheduleBGM();
+}
+
+function scheduleBGM(){
+  if(!bgmRunning)return;
+  const ctx=bgmCtx;
+  const bpm=148+(wave-1)*8;
+  const beat=60/bpm;
+  const bar=beat*4;
+
+  // ホラー感のあるマイナーペンタ進行
+  // A minor feel: A2 C3 D3 E3 G3
+  const bassNotes=[
+    55,55,55,55, 58,58,55,55,
+    52,52,52,52, 53,53,55,55
+  ]; // A1,A1,A1,A1, Bb,Bb,A,A, G#,G#,G#,G#, Ab,Ab,A,A
+
+  // メロディ（高め）
+  const melNotes=[
+    220,0,261,0, 294,0,329,0,
+    0,392,0,349, 294,0,220,0,
+    261,0,294,0, 220,0,196,0,
+    0,220,0,261, 294,349,294,220
+  ];
+
+  // パーカッション: kick=1, snare=2, hihat=3
+  const drums=[
+    1,3,2,3, 1,3,2,3,
+    1,3,2,3, 1,1,2,3
+  ];
+
+  const totalBeats=bassNotes.length;
+  const now=ctx.currentTime+0.05;
+
+  function makeOsc(freq,type,startT,dur,vol,detune=0){
+    if(!freq||!bgmRunning)return null;
+    const osc=ctx.createOscillator();
+    const g=ctx.createGain();
+    osc.type=type;
+    osc.frequency.value=freq;
+    osc.detune.value=detune;
+    g.gain.setValueAtTime(0,startT);
+    g.gain.linearRampToValueAtTime(vol,startT+0.01);
+    g.gain.exponentialRampToValueAtTime(0.001,startT+dur);
+    osc.connect(g);g.connect(bgmMasterGain||ctx.destination);
+    osc.start(startT);osc.stop(startT+dur+0.05);
+    bgmNodes.push(osc);
+    return osc;
+  }
+
+  function makeNoise(startT,dur,vol,hipass=200){
+    if(!bgmRunning)return;
+    const buf=ctx.createBuffer(1,Math.ceil(ctx.sampleRate*dur),ctx.sampleRate);
+    const d=buf.getChannelData(0);
+    for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1;
+    const src=ctx.createBufferSource();src.buffer=buf;
+    const filt=ctx.createBiquadFilter();filt.type='highpass';filt.frequency.value=hipass;
+    const g=ctx.createGain();
+    g.gain.setValueAtTime(vol,startT);
+    g.gain.exponentialRampToValueAtTime(0.001,startT+dur);
+    src.connect(filt);filt.connect(g);g.connect(bgmMasterGain||ctx.destination);
+    src.start(startT);src.stop(startT+dur+0.05);
+    bgmNodes.push(src);
+  }
+
+  // ベースライン
+  for(let i=0;i<totalBeats;i++){
+    const t=now+i*beat;
+    const freq=bassNotes[i%bassNotes.length];
+    makeOsc(freq,'sawtooth',t,beat*0.7,0.09);
+    makeOsc(freq*2,'sine',t,beat*0.5,0.04);
+  }
+
+  // メロディ
+  for(let i=0;i<melNotes.length;i++){
+    const t=now+i*(bar/8);
+    const freq=melNotes[i];
+    if(freq)makeOsc(freq,'square',t,bar/8*0.6,0.04,-10);
+  }
+
+  // ドラム
+  for(let i=0;i<totalBeats;i++){
+    const t=now+i*beat;
+    const d=drums[i%drums.length];
+    if(d===1){// kick
+      const osc=ctx.createOscillator();const g=ctx.createGain();
+      osc.frequency.setValueAtTime(120,t);osc.frequency.exponentialRampToValueAtTime(40,t+0.15);
+      g.gain.setValueAtTime(0.5,t);g.gain.exponentialRampToValueAtTime(0.001,t+0.2);
+      osc.connect(g);g.connect(bgmMasterGain||ctx.destination);osc.start(t);osc.stop(t+0.25);bgmNodes.push(osc);
+    }
+    if(d===2){// snare
+      makeNoise(t,0.12,0.18,1000);
+      makeOsc(180,'sine',t,0.08,0.12);
+    }
+    if(d===3){// hihat
+      makeNoise(t,0.04,0.07,8000);
+    }
+  }
+
+  // 1ループ後に再スケジュール
+  const loopDur=totalBeats*beat;
+  setTimeout(()=>scheduleBGM(), (loopDur-0.3)*1000);
+}
+
+function setBGMVolume(val){
+  bgmVolume=val/100;
+  if(bgmMasterGain)bgmMasterGain.gain.value=bgmVolume;
+  // スライダーのグラデーション更新
+  const s=document.getElementById('bgm-slider');
+  s.style.background=`linear-gradient(to right,#2aff5a 0%,#2aff5a ${val}%,#0a2a0a ${val}%,#0a2a0a 100%)`;
+}
+
+// ─── INIT THREE.JS ───
+let ambientLight=null; // 室内フラッシュ用
+function init(){
+  const wrap=document.getElementById('wrap');
+  scene=new THREE.Scene();
+  scene.background=new THREE.Color(0x050a05);
+  scene.fog=new THREE.FogExp2(0x050a05,0.042);
+  camera=new THREE.PerspectiveCamera(70,wrap.clientWidth/wrap.clientHeight,0.1,80);
+  camera.position.set(0,2,1);
+  camera.lookAt(0,1.5,-10);
+  renderer=new THREE.WebGLRenderer({canvas:document.getElementById('c'),antialias:true});
+  renderer.setSize(wrap.clientWidth,wrap.clientHeight);
+  renderer.shadowMap.enabled=true;
+  clock=new THREE.Clock();
+
+  ambientLight=new THREE.AmbientLight(0x2a3a22,2.2);
+  scene.add(ambientLight);
+  const dir=new THREE.DirectionalLight(0x668855,2.2);
+  dir.position.set(3,10,-5);dir.castShadow=true;scene.add(dir);
+  const red=new THREE.PointLight(0xcc1100,6,28);
+  red.position.set(0,6,-8);scene.add(red);
+  const green=new THREE.PointLight(0x224400,5,26);
+  green.position.set(-4,3,-12);scene.add(green);
+  const red2=new THREE.PointLight(0xaa2200,4,20);
+  red2.position.set(5,2,-15);scene.add(red2);
+  const fill=new THREE.PointLight(0x334428,4,40);
+  fill.position.set(0,8,0);scene.add(fill);
+
+  const floor=new THREE.Mesh(new THREE.PlaneGeometry(30,60),new THREE.MeshLambertMaterial({color:0x0c180c}));
+  floor.rotation.x=-Math.PI/2;floor.receiveShadow=true;scene.add(floor);
+
+  for(let i=0;i<8;i++){
+    const w=0.4+Math.random()*0.6,h=1.5+Math.random()*4,d=0.4+Math.random()*0.6;
+    const b=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),new THREE.MeshLambertMaterial({color:0x080f08}));
+    b.position.set((Math.random()>0.5?1:-1)*(3+Math.random()*5),h/2,-5-Math.random()*20);
+    b.castShadow=true;scene.add(b);
+  }
+  window.addEventListener('resize',()=>{
+    camera.aspect=wrap.clientWidth/wrap.clientHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(wrap.clientWidth,wrap.clientHeight);
+  });
+}
+
+// ─── ZOMBIE MODEL ───
+function makeZombieModel(){
+  const g=new THREE.Group();
+
+  // ゾンビタイプ：0=腐敗体、1=骸骨顔、2=肥大化、3=引き裂かれた
+  const variant=Math.floor(Math.random()*4);
+
+  // 腐肉色パレット — より暗く病的に
+  const skinColors=[0x3a4a28, 0x2e3d1e, 0x4a3020, 0x2d3a20];
+  const clothColors=[0x1a120a, 0x121a0a, 0x150f18, 0x0a1415];
+  const darkSkinColors=[0x283418, 0x1e2a12, 0x321e14, 0x1e2818];
+
+  const skinC=skinColors[variant];
+  const clothC=clothColors[variant];
+  const skinDarkC=darkSkinColors[variant];
+
+  const mSkin=new THREE.MeshLambertMaterial({color:skinC});
+  const mSkinDark=new THREE.MeshLambertMaterial({color:skinDarkC});
+  const mCloth=new THREE.MeshLambertMaterial({color:clothC});
+  const mEyeGlow=new THREE.MeshBasicMaterial({color:0xffdd00}); // 発光する黄色い目
+  const mEyeWhite=new THREE.MeshBasicMaterial({color:0xccbbaa}); // 白目（濁り）
+  const mBlood=new THREE.MeshBasicMaterial({color:0x6b0000});
+  const mBloodFresh=new THREE.MeshBasicMaterial({color:0x990000});
+  const mBone=new THREE.MeshLambertMaterial({color:0xc8b882});
+  const mBoneDark=new THREE.MeshLambertMaterial({color:0xa09060});
+  const mGore=new THREE.MeshBasicMaterial({color:0x7a1a00}); // 内臓
+
+  // スケールをランダムに（個体差）
+  const bodyScale=0.85+Math.random()*0.45;
+  const fatness=variant===2?1.35:0.9+Math.random()*0.25;
+
+  // ── 胴体（前傾み・大きめ）──
+  const torsoW=0.58*fatness;const torsoH=0.8;const torsoD=0.32*fatness;
+  const torso=new THREE.Mesh(new THREE.BoxGeometry(torsoW,torsoH,torsoD),mCloth);
+  torso.position.y=1.05;
+  torso.rotation.x=0.18+Math.random()*0.1; // 前のめり
+  torso.scale.set(bodyScale,bodyScale,bodyScale);
+  torso.castShadow=true;g.add(torso);
+
+  // 胸の骨が浮き出る（痩せ型）
+  if(variant!==2){
+    [-0.12,0,0.12].forEach(x=>{
+      const rib=new THREE.Mesh(new THREE.BoxGeometry(0.28,0.03,0.34),mBoneDark);
+      rib.position.set(x*fatness, 1.0+x*0.15, 0);rib.rotation.x=0.18;g.add(rib);
+    });
+  }
+
+  // 腹の大きな裂け目（内臓露出）
+  if(Math.random()>0.35){
+    const tearH=0.12+Math.random()*0.1;
+    const tear=new THREE.Mesh(new THREE.BoxGeometry(0.22*fatness,tearH,0.34*fatness),mGore);
+    tear.position.set((Math.random()-0.5)*0.12, 0.88+Math.random()*0.15, 0);
+    tear.rotation.x=0.18;g.add(tear);
+    // 血だまり（下方向）
+    const drip=new THREE.Mesh(new THREE.BoxGeometry(0.18*fatness, 0.18, 0.32*fatness),mBlood);
+    drip.position.set(tear.position.x, tear.position.y-0.14, 0);
+    drip.rotation.x=0.18;g.add(drip);
+  } else {
+    // 血の染み
+    const stain=new THREE.Mesh(new THREE.BoxGeometry(0.24*fatness,0.1,0.34*fatness),mBlood);
+    stain.position.set((Math.random()-0.5)*0.1, 0.9+Math.random()*0.2, 0);
+    stain.rotation.x=0.18;g.add(stain);
+  }
+
+  // 背中の腐敗（後ろ）
+  const backRot=new THREE.Mesh(new THREE.BoxGeometry(0.3*fatness,0.2,0.34*fatness),mBlood);
+  backRot.position.set((Math.random()-0.5)*0.1, 0.95+Math.random()*0.2, 0);
+  backRot.rotation.x=0.18;g.add(backRot);
+
+  // ── 首（細く引き延ばされた感じ）──
+  const neckTilt=(Math.random()-0.5)*0.3;
+  const neck=new THREE.Mesh(new THREE.CylinderGeometry(0.09,0.13,0.22,7),mSkinDark);
+  neck.position.y=1.52*bodyScale;neck.rotation.z=neckTilt;g.add(neck);
+
+  // 首筋の筋肉・傷
+  if(Math.random()>0.5){
+    const neckScar=new THREE.Mesh(new THREE.BoxGeometry(0.04,0.18,0.05),mBlood);
+    neckScar.position.set(0.08, 1.52*bodyScale, 0.07);g.add(neckScar);
+  }
+
+  // ── 頭部（より大きく、いびつに）──
+  const headGroup=new THREE.Group();
+  headGroup.position.y=1.72*bodyScale;
+
+  // 頭本体（いびつな形状 — 複数のボックスで構成）
+  const headW=0.42+Math.random()*0.06;const headH=0.42+Math.random()*0.05;
+  const headMesh=new THREE.Mesh(new THREE.BoxGeometry(headW,headH,0.38),mSkin);
+  headMesh.rotation.z=neckTilt*0.5+(Math.random()-0.5)*0.2;
+  headMesh.rotation.x=0.12+Math.random()*0.08;
+  headGroup.add(headMesh);
+
+  // 頬骨が出っ張る（頬）
+  [-0.18,0.18].forEach(x=>{
+    const cheek=new THREE.Mesh(new THREE.BoxGeometry(0.1,0.12,0.12),mSkin);
+    cheek.position.set(x, -0.02, 0.16);headGroup.add(cheek);
+  });
+
+  // 額の腐敗・傷
+  if(Math.random()>0.4){
+    const headWound=new THREE.Mesh(new THREE.BoxGeometry(0.14,0.08,0.05),mBlood);
+    headWound.position.set((Math.random()-0.5)*0.15, 0.14+Math.random()*0.05, 0.2);
+    headGroup.add(headWound);
+  }
+
+  // ── 目（飛び出した眼球）──
+  [-0.13,0.12].forEach((x,i)=>{
+    const eyeProtrude=0.03+Math.random()*0.04; // 眼球の飛び出し量
+    const eyeSize=0.06+Math.random()*0.025;
+
+    // 白目（血走り、濁った）
+    const eyeWhite=new THREE.Mesh(new THREE.BoxGeometry(eyeSize+0.04,eyeSize+0.02,eyeProtrude+0.06),mEyeWhite);
+    eyeWhite.position.set(x+(Math.random()-0.5)*0.02, 0.06+(i===0?Math.random()*0.04-0.02:0), 0.19+eyeProtrude*0.3);
+    headGroup.add(eyeWhite);
+
+    // 瞳（黄色く光る）
+    const iris=new THREE.Mesh(new THREE.BoxGeometry(eyeSize,eyeSize,eyeProtrude+0.04),mEyeGlow);
+    iris.position.set(x+(Math.random()-0.5)*0.02, 0.06+(i===0?Math.random()*0.04-0.02:0), 0.21+eyeProtrude*0.4);
+    headGroup.add(iris);
+
+    // 充血した目の縁（赤い血管）
+    const eyeVein=new THREE.Mesh(new THREE.BoxGeometry(eyeSize+0.06,eyeSize+0.04,0.02),mBloodFresh);
+    eyeVein.position.set(x+(Math.random()-0.5)*0.02, 0.06+(i===0?Math.random()*0.04-0.02:0), 0.17);
+    headGroup.add(eyeVein);
+
+    // 片目が飛び出してる個体（タイプ1）
+    if(variant===1&&i===0){
+      const bulge=new THREE.Mesh(new THREE.BoxGeometry(eyeSize+0.06,eyeSize+0.04,0.08),mEyeWhite);
+      bulge.position.set(x, 0.07, 0.23);headGroup.add(bulge);
+    }
+  });
+
+  // ── 鼻（腐って崩れた）──
+  if(Math.random()>0.5){
+    const nose=new THREE.Mesh(new THREE.BoxGeometry(0.07,0.06,0.08),mSkinDark);
+    nose.position.set((Math.random()-0.5)*0.04,-0.04,0.22);headGroup.add(nose);
+  } else {
+    // 鼻が欠けてる（穴だけ）
+    const nostril=new THREE.Mesh(new THREE.BoxGeometry(0.09,0.05,0.04),mBlood);
+    nostril.position.set(0,-0.04,0.2);headGroup.add(nostril);
+  }
+
+  // ── 口（大きく開いた顎）──
+  // 下顎（外れかけ）
+  const jawDrop=0.06+Math.random()*0.08; // 顎の開き
+  const jaw=new THREE.Mesh(new THREE.BoxGeometry(0.3,0.1,0.3),mSkinDark);
+  jaw.position.set(0,-0.18-jawDrop,0.04);jaw.rotation.x=0.15+jawDrop;
+  headGroup.add(jaw);
+
+  // 口の空洞（暗い穴）
+  const mouth=new THREE.Mesh(new THREE.BoxGeometry(0.24,0.1,0.05),mBlood);
+  mouth.position.set(0,-0.14-jawDrop*0.5,0.2);headGroup.add(mouth);
+
+  // 上の歯
+  [-0.09,-0.05,-0.01,0.03,0.07].forEach(x=>{
+    if(Math.random()>0.25){
+      const toothH=0.05+Math.random()*0.04;
+      const tooth=new THREE.Mesh(new THREE.BoxGeometry(0.04,toothH,0.04),mBone);
+      tooth.position.set(x,-0.1,0.2);
+      tooth.rotation.z=(Math.random()-0.5)*0.3;
+      headGroup.add(tooth);
+    }
+  });
+  // 下の歯（顎に付いてる）
+  [-0.08,-0.03,0.02,0.07].forEach(x=>{
+    if(Math.random()>0.3){
+      const tooth=new THREE.Mesh(new THREE.BoxGeometry(0.035,0.04+Math.random()*0.03,0.035),mBone);
+      tooth.position.set(x,-0.18-jawDrop+0.04,0.2);
+      tooth.rotation.x=0.15+jawDrop;
+      headGroup.add(tooth);
+    }
+  });
+
+  // 舌（腐った黒ずんだ色）
+  if(Math.random()>0.5){
+    const tongue=new THREE.Mesh(new THREE.BoxGeometry(0.1,0.04,0.12),
+      new THREE.MeshLambertMaterial({color:0x6a1a2a}));
+    tongue.position.set(0,-0.16-jawDrop,0.18);tongue.rotation.x=0.3+jawDrop;
+    headGroup.add(tongue);
+  }
+
+  // 口から垂れる血
+  const bloodDrip=new THREE.Mesh(new THREE.BoxGeometry(0.08+Math.random()*0.08,0.12+Math.random()*0.08,0.04),mBloodFresh);
+  bloodDrip.position.set((Math.random()-0.5)*0.06,-0.28-jawDrop,0.18);headGroup.add(bloodDrip);
+
+  // 頬の大きな裂傷（骨が見える）
+  if(Math.random()>0.4){
+    const cheekTear=new THREE.Mesh(new THREE.BoxGeometry(0.14,0.06,0.06),mBlood);
+    cheekTear.position.set((Math.random()>0.5?1:-1)*0.17, -0.02+Math.random()*0.06, 0.2);
+    headGroup.add(cheekTear);
+    // 裂傷内の骨
+    const cheekBone=new THREE.Mesh(new THREE.BoxGeometry(0.08,0.04,0.04),mBone);
+    cheekBone.position.set(cheekTear.position.x*0.9, cheekTear.position.y, 0.21);
+    headGroup.add(cheekBone);
+  }
+
+  g.add(headGroup);
+
+  // ── 髪（ボサボサ、ところどころ剥がれた）──
+  const hairColor=Math.random()>0.5?0x0f0a04:0x1a1818;
+  const hairMat=new THREE.MeshLambertMaterial({color:hairColor});
+  const hairCount=Math.floor(4+Math.random()*5);
+  for(let i=0;i<hairCount;i++){
+    const hw=0.07+Math.random()*0.1;const hh=0.08+Math.random()*0.14;
+    const hair=new THREE.Mesh(new THREE.BoxGeometry(hw,hh,0.08),hairMat);
+    hair.position.set((Math.random()-0.5)*0.38, 1.96*bodyScale+Math.random()*0.08, (Math.random()-0.5)*0.22);
+    hair.rotation.z=(Math.random()-0.5)*0.6;
+    hair.rotation.x=(Math.random()-0.5)*0.3;
+    g.add(hair);
+  }
+  // 頭皮の剥がれ（血）
+  if(Math.random()>0.5){
+    const scalp=new THREE.Mesh(new THREE.BoxGeometry(0.14,0.06,0.14),mBlood);
+    scalp.position.set((Math.random()-0.5)*0.18, 1.94*bodyScale, (Math.random()-0.5)*0.12);
+    g.add(scalp);
+  }
+
+  // ── 脚（引きずり、非対称、ボロいズボン）──
+  const legScaleL=0.92+Math.random()*0.12;
+  const legScaleR=0.92+Math.random()*0.12;
+
+  const legL=new THREE.Group();legL.position.set(-0.17*fatness,0.62*bodyScale,0);
+  const lLupper=new THREE.Mesh(new THREE.BoxGeometry(0.24*fatness,0.42,0.24*fatness),mCloth);lLupper.position.y=-0.21;legL.add(lLupper);
+  // 膝の骨が露出
+  if(Math.random()>0.5){
+    const kneeBone=new THREE.Mesh(new THREE.BoxGeometry(0.14,0.08,0.08),mBone);
+    kneeBone.position.set(0,-0.4,0.1);legL.add(kneeBone);
+  }
+  const lLknee=new THREE.Group();lLknee.position.y=-0.42;
+  const lLlower=new THREE.Mesh(new THREE.BoxGeometry(0.2*fatness,0.38,0.2*fatness),mCloth);lLlower.position.y=-0.19;lLknee.add(lLlower);
+  // 脚の傷
+  if(Math.random()>0.5){const legWound=new THREE.Mesh(new THREE.BoxGeometry(0.22*fatness,0.08,0.22*fatness),mBlood);legWound.position.y=-0.12;lLknee.add(legWound);}
+  const lLfoot=new THREE.Mesh(new THREE.BoxGeometry(0.22,0.12,0.32),mSkinDark);lLfoot.position.set(0.02,-0.4,0.06);lLknee.add(lLfoot);
+  // 足の爪
+  [-0.06,-0.02,0.03,0.07].forEach(x=>{
+    if(Math.random()>0.4){const toenail=new THREE.Mesh(new THREE.BoxGeometry(0.04,0.03,0.06),mBoneDark);toenail.position.set(x,-0.44,0.2);lLknee.add(toenail);}
+  });
+  legL.add(lLknee);g.add(legL);
+
+  const legR=new THREE.Group();legR.position.set(0.17*fatness,0.62*bodyScale,0);
+  const lRupper=new THREE.Mesh(new THREE.BoxGeometry(0.24*fatness,0.42,0.24*fatness),mCloth);lRupper.position.y=-0.21;legR.add(lRupper);
+  const lRknee=new THREE.Group();lRknee.position.y=-0.42;
+  const lRlower=new THREE.Mesh(new THREE.BoxGeometry(0.2*fatness,0.38,0.2*fatness),mCloth);lRlower.position.y=-0.19;lRknee.add(lRlower);
+  const lRfoot=new THREE.Mesh(new THREE.BoxGeometry(0.22,0.12,0.32),mSkinDark);lRfoot.position.set(-0.02,-0.4,0.06);lRknee.add(lRfoot);
+  legR.add(lRknee);g.add(legR);
+
+  // ── 腕（より長く、爪が伸びた）──
+  const armL=new THREE.Group();armL.position.set(-0.40*fatness,1.12*bodyScale,0);
+  armL.rotation.x=-0.65;armL.rotation.z=0.2;
+  const aLupper=new THREE.Mesh(new THREE.BoxGeometry(0.19*fatness,0.42,0.19*fatness),mCloth);aLupper.position.y=-0.21;armL.add(aLupper);
+  // 二の腕の血
+  if(Math.random()>0.5){const aWound=new THREE.Mesh(new THREE.BoxGeometry(0.2*fatness,0.07,0.2*fatness),mBlood);aWound.position.y=-0.15;armL.add(aWound);}
+  const aLelbow=new THREE.Group();aLelbow.position.y=-0.42;
+  const aLlower=new THREE.Mesh(new THREE.BoxGeometry(0.16*fatness,0.36,0.16*fatness),mSkin);aLlower.position.y=-0.18;aLelbow.add(aLlower);
+  // 肘の骨
+  const elbowBoneL=new THREE.Mesh(new THREE.BoxGeometry(0.06,0.06,0.06),mBone);elbowBoneL.position.set(0.04,-0.02,0.08);aLelbow.add(elbowBoneL);
+  // 手（大きめの爪付き）
+  const handL=new THREE.Group();handL.position.y=-0.38;
+  const palmL=new THREE.Mesh(new THREE.BoxGeometry(0.18,0.14,0.12),mSkinDark);handL.add(palmL);
+  [-0.07,-0.03,0.01,0.06].forEach((x,fi)=>{
+    const flen=0.1+Math.random()*0.04;
+    const finger=new THREE.Mesh(new THREE.BoxGeometry(0.04,flen,0.04),mSkin);
+    finger.position.set(x,-0.12-flen*0.4,0.01);finger.rotation.z=(Math.random()-0.5)*0.35;
+    handL.add(finger);
+    // 長い爪（鉤爪）
+    const clawLen=0.06+Math.random()*0.05;
+    const claw=new THREE.Mesh(new THREE.BoxGeometry(0.03,clawLen,0.025),mBoneDark);
+    claw.position.set(x,-0.12-flen-clawLen*0.3,0);
+    claw.rotation.z=finger.rotation.z;claw.rotation.x=0.2;
+    handL.add(claw);
+  });
+  // 親指
+  const thumbL=new THREE.Mesh(new THREE.BoxGeometry(0.04,0.08,0.04),mSkin);
+  thumbL.position.set(-0.1,-0.1,0);thumbL.rotation.z=0.5;handL.add(thumbL);
+  aLelbow.add(handL);armL.add(aLelbow);g.add(armL);
+
+  const armR=new THREE.Group();armR.position.set(0.40*fatness,1.12*bodyScale,0);
+  armR.rotation.x=-0.45;armR.rotation.z=-0.25;
+  const aRupper=new THREE.Mesh(new THREE.BoxGeometry(0.19*fatness,0.42,0.19*fatness),mCloth);aRupper.position.y=-0.21;armR.add(aRupper);
+  const aRelbow=new THREE.Group();aRelbow.position.y=-0.42;
+  const aRlower=new THREE.Mesh(new THREE.BoxGeometry(0.16*fatness,0.36,0.16*fatness),mSkin);aRlower.position.y=-0.18;aRelbow.add(aRlower);
+  const handR=new THREE.Group();handR.position.y=-0.38;
+  const palmR=new THREE.Mesh(new THREE.BoxGeometry(0.18,0.14,0.12),mSkinDark);handR.add(palmR);
+  [-0.07,-0.03,0.01,0.06].forEach((x,fi)=>{
+    const flen=0.1+Math.random()*0.04;
+    const finger=new THREE.Mesh(new THREE.BoxGeometry(0.04,flen,0.04),mSkin);
+    finger.position.set(x,-0.12-flen*0.4,0);finger.rotation.z=(Math.random()-0.5)*0.35;
+    handR.add(finger);
+    const clawLen=0.06+Math.random()*0.05;
+    const claw=new THREE.Mesh(new THREE.BoxGeometry(0.03,clawLen,0.025),mBoneDark);
+    claw.position.set(x,-0.12-flen-clawLen*0.3,0);
+    claw.rotation.z=finger.rotation.z;claw.rotation.x=0.2;
+    handR.add(claw);
+  });
+  const thumbR=new THREE.Mesh(new THREE.BoxGeometry(0.04,0.08,0.04),mSkin);
+  thumbR.position.set(0.1,-0.1,0);thumbR.rotation.z=-0.5;handR.add(thumbR);
+  aRelbow.add(handR);armR.add(aRelbow);g.add(armR);
+
+  // ── 胴体からの大きな腕の傷 ──
+  if(Math.random()>0.4){
+    const armGash=new THREE.Mesh(new THREE.BoxGeometry(0.2*fatness,0.1,0.2*fatness),mGore);
+    armGash.position.set(Math.random()>0.5?-0.42*fatness:0.42*fatness, 0.92*bodyScale, 0);g.add(armGash);
+  }
+
+  // ── 目の発光（ポイントライト）──
+  const eyeLight=new THREE.PointLight(0xffdd00,0.8,1.8);
+  eyeLight.position.set(0, headGroup.position.y+0.06, 0.25);
+  g.add(eyeLight);
+
+  g.userData={legL,legR,lLknee,lRknee,armL,armR,aLelbow,aRelbow,headGroup,variant};
+  return g;
+}
+
+// ─── BULLETS ───
+function fireBullet(targetZombie){
+  if(ammo<=0){playEmpty();enterReloadMode();return;}
+  ammo--;
+  updateAmmoUI();
+  if(ammo===0){setTimeout(()=>enterReloadMode(),120);}
+
+  const fromPos=new THREE.Vector3((Math.random()-0.5)*0.3,1.6+Math.random()*0.1,0.5);
+  const toPos=new THREE.Vector3(
+    targetZombie.mesh.position.x+(Math.random()-0.5)*0.15,
+    targetZombie.mesh.position.y+1.0+(Math.random()-0.5)*0.3,
+    targetZombie.mesh.position.z
+  );
+  const dir=toPos.clone().sub(fromPos).normalize();
+  const geo=new THREE.SphereGeometry(0.04,4,4);
+  const mat=new THREE.MeshBasicMaterial({color:0xffee44});
+  const mesh=new THREE.Mesh(geo,mat);
+  mesh.position.copy(fromPos);
+  const trail=new THREE.Mesh(
+    new THREE.CylinderGeometry(0.015,0.015,0.3,4),
+    new THREE.MeshBasicMaterial({color:0xff8800,transparent:true,opacity:0.5})
+  );
+  trail.position.copy(fromPos);
+  const axis=new THREE.Vector3(0,1,0);
+  trail.quaternion.setFromUnitVectors(axis,dir);
+  scene.add(mesh);scene.add(trail);
+
+  // 発射時のマズルフラッシュ光
+  const muzzleLight=new THREE.PointLight(0xffdd44,6,4);
+  muzzleLight.position.copy(fromPos);scene.add(muzzleLight);
+  setTimeout(()=>scene.remove(muzzleLight),55);
+
+  // 弾に追従するポイントライト（軌道を照らす）
+  const bulletLight=new THREE.PointLight(0xff9900,4,3.5);
+  bulletLight.position.copy(fromPos);scene.add(bulletLight);
+
+  bullets.push({mesh,trail,bulletLight,dir,speed:0.9,dist:fromPos.distanceTo(toPos),traveled:0,targetZ:targetZombie,alive:true});
+}
+
+function updateBullets(){
+  for(let i=bullets.length-1;i>=0;i--){
+    const b=bullets[i];
+    if(!b.alive)continue;
+    b.traveled+=b.speed;
+    b.mesh.position.addScaledVector(b.dir,b.speed);
+    b.trail.position.copy(b.mesh.position).addScaledVector(b.dir,-0.15);
+    // ライトを弾頭に追従させる
+    b.bulletLight.position.copy(b.mesh.position);
+    if(b.traveled>=b.dist){
+      scene.remove(b.mesh);scene.remove(b.trail);
+      scene.remove(b.bulletLight);
+      b.alive=false;
+    }
+  }
+}
+
+// ─── AMMO UI ───
+function updateAmmoUI(){
+  // top-right pip display
+  const av=document.getElementById('av');
+  av.textContent='■'.repeat(ammo)+'□'.repeat(MAX_AMMO-ammo);
+  av.style.color=ammo<=2?'#ff3333':ammo<=4?'#ffcc00':'#ff8c00';
+
+  // weapon bar pips
+  const bar=document.getElementById('ammo-bar');
+  bar.innerHTML='';
+  for(let i=0;i<MAX_AMMO;i++){
+    const pip=document.createElement('div');
+    pip.className='ammo-pip'+(i>=ammo?' empty':'');
+    bar.appendChild(pip);
+  }
+}
+
+// ─── RELOAD LOGIC ───
+function enterReloadMode(){
+  reloadMode=true;
+  reloadTyped='';
+  const wrap=document.getElementById('input-wrap');
+  wrap.classList.add('reload-mode');
+  document.getElementById('mode-badge').textContent='LOAD';
+  document.getElementById('tab-hint').textContent='[TAB] = EXIT RELOAD　"reload"と入力してリロード';
+  document.getElementById('tab-hint').classList.add('active');
+  document.getElementById('ti').value='';
+  document.getElementById('ti').placeholder='reload';
+  document.getElementById('reload-flash').classList.add('active');
+  setTimeout(()=>document.getElementById('reload-flash').classList.remove('active'),200);
+  showBanner('── RELOAD MODE ──',true);
+}
+
+function exitReloadMode(){
+  reloadMode=false;
+  reloadTyped='';
+  const wrap=document.getElementById('input-wrap');
+  wrap.classList.remove('reload-mode');
+  wrap.classList.remove('err-mode');
+  document.getElementById('mode-badge').textContent='FIRE';
+  document.getElementById('tab-hint').textContent='[TAB] = RELOAD MODE';
+  document.getElementById('tab-hint').classList.remove('active');
+  document.getElementById('ti').value=target?target.typed:'';
+  document.getElementById('ti').placeholder='TYPE TO SHOOT';
+}
+
+function doReload(){
+  playReload();
+  ammo=MAX_AMMO;
+  updateAmmoUI();
+  showBanner('✦ RELOADED! ✦');
+  const rf=document.getElementById('reload-flash');
+  rf.classList.add('active');
+  setTimeout(()=>rf.classList.remove('active'),300);
+  exitReloadMode();
+}
+
+// ─── HUD ───
+function worldToScreen(pos){
+  const v=pos.clone().project(camera);
+  const wrap=document.getElementById('wrap');
+  return{x:(v.x*0.5+0.5)*wrap.clientWidth,y:(-v.y*0.5+0.5)*wrap.clientHeight,behind:v.z>1};
+}
+
+function updateLabels(){
+  const container=document.getElementById('labels');
+  container.innerHTML='';
+  // 遠い順にソートして描画→手前のゾンビが常に上に重なる
+  const alive=zombies.filter(z=>z.alive);
+  alive.sort((a,b)=>camera.position.distanceTo(b.mesh.position)-camera.position.distanceTo(a.mesh.position));
+  alive.forEach((z,i)=>{
+    const lp=new THREE.Vector3(z.mesh.position.x,z.mesh.position.y+2.3,z.mesh.position.z);
+    const s=worldToScreen(lp);
+    if(s.behind)return;
+    const dist=camera.position.distanceTo(z.mesh.position);
+    const scale=Math.max(0.55,Math.min(1.3,11/dist));
+    const isT=(z===target);
+    const zIdx=isT?9999:(i+1)*10;
+    const div=document.createElement('div');
+    div.style.cssText=`position:absolute;left:${s.x}px;top:${s.y}px;transform:translate(-50%,-50%) scale(${scale});white-space:nowrap;z-index:${zIdx};`;
+
+    const typed=`<span style="color:#2aff5a;text-shadow:0 0 6px rgba(42,255,90,0.8)">${z.typed}</span>`;
+    const rest=`<span style="color:${isT?'#fff':'#7a8a7a'}">${z.word.slice(z.typed.length)}</span>`;
+    const border=isT?'#2aff5a':'#2a5a2a';
+    const bg=isT?'rgba(0,30,10,0.97)':'rgba(0,0,0,0.88)';
+    const glow=isT?';box-shadow:0 0 12px rgba(42,255,90,0.4)':'';
+    div.innerHTML=`<div style="background:${bg};border:2px solid ${border};border-radius:3px;padding:5px 14px;font-family:'Share Tech Mono',monospace;font-size:20px;letter-spacing:2px${glow}">${typed}${rest}</div><div style="width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-top:7px solid ${border};margin:0 auto"></div>`;
+    container.appendChild(div);
+  });
+
+  // アイテムラベル（ハート色）
+  items.filter(it=>it.alive).forEach(it=>{
+    const lp=new THREE.Vector3(it.mesh.position.x,it.mesh.position.y+0.9,it.mesh.position.z);
+    const s=worldToScreen(lp);
+    if(s.behind)return;
+    const isT=(it===target);
+    const div=document.createElement('div');
+    div.style.cssText=`position:absolute;left:${s.x}px;top:${s.y}px;transform:translate(-50%,-50%);white-space:nowrap;z-index:${isT?9998:500};`;
+    const typedSpan=`<span style="color:#ff88aa;text-shadow:0 0 6px rgba(255,100,150,0.9)">${it.typed}</span>`;
+    const restSpan=`<span style="color:${isT?'#ffccdd':'#884455'}">${it.word.slice(it.typed.length)}</span>`;
+    const border=isT?'#ff4477':'#882244';
+    const bg=isT?'rgba(40,0,15,0.97)':'rgba(20,0,8,0.88)';
+    const glow=isT?';box-shadow:0 0 14px rgba(255,50,100,0.6)':'';
+    div.innerHTML=`<div style="background:${bg};border:2px solid ${border};border-radius:3px;padding:3px 10px;font-family:'Share Tech Mono',monospace;font-size:19px;letter-spacing:2px${glow}">♥ ${typedSpan}${restSpan}</div><div style="width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;border-top:6px solid ${border};margin:0 auto"></div>`;
+    container.appendChild(div);
+  });
+}
+
+function updateHUD(){
+  const pad=n=>String(n).padStart(6,'0');
+  document.getElementById('sv').textContent=pad(score);
+  document.getElementById('wv').textContent=wave;
+  document.getElementById('lv').textContent='♥'.repeat(lives)+'♡'.repeat(Math.max(0,3-lives));
+  updateAmmoUI();
+}
+
+// ─── SPAWN / WAVE ───
+function spawnZombie(){
+  // 現在生きているゾンビのワードと被らないように選ぶ
+  const usedWords=new Set(zombies.filter(z=>z.alive).map(z=>z.word));
+  const available=WORDS.filter(w=>!usedWords.has(w));
+  const pool=available.length>0?available:WORDS; // 全部被ってたら仕方なく全体から
+  const word=pool[Math.floor(Math.random()*pool.length)];
+  const mesh=makeZombieModel();
+  const xOff=(Math.random()-0.5)*6;
+  mesh.position.set(xOff,0,-25);
+  scene.add(mesh);
+  const speed=0.018+wave*0.003+Math.random()*0.004;  // エンドレスでも上限設定
+  const z={mesh,word,typed:'',speed,alive:true,phase:Math.random()*Math.PI*2};
+  zombies.push(z);
+  if(!target)setTarget(z);
+}
+
+function setTarget(z){
+  target=z;
+  if(!reloadMode)document.getElementById('ti').value=z?z.typed:'';
+}
+
+function getClosest(){
+  const alive=zombies.filter(z=>z.alive);
+  if(!alive.length)return null;
+  return alive.reduce((a,b)=>a.mesh.position.z>b.mesh.position.z?a:b);
+}
+
+function beginWave(){
+  // エンドレス: wave数に応じてゾンビ数・難易度増加
+  const baseCount=WZCOUNT[Math.min(wave-1,WZCOUNT.length-1)];
+  spawnsLeft=wave<=WZCOUNT.length ? baseCount : baseCount + Math.floor((wave-WZCOUNT.length)*1.5);
+  nextSpawnTime=clock.getElapsedTime()+1.0;
+  waveClearing=false;
+  showBanner('WAVE '+wave);
+}
+
+// ─── BANNERS ───
+function showBanner(txt,warn=false){
+  const old=document.getElementById('banner');if(old)old.remove();
+  const el=document.createElement('div');
+  el.id='banner';el.textContent=txt;
+  el.style.cssText=`position:absolute;top:42%;left:50%;transform:translate(-50%,-50%);
+    color:${warn?'#ff8c00':'#2aff5a'};font-family:'Press Start 2P',monospace;font-size:${warn?'13':'18'}px;
+    letter-spacing:3px;z-index:10;pointer-events:none;opacity:0;transition:opacity 0.25s;
+    text-shadow:0 0 20px ${warn?'rgba(255,140,0,0.9)':'rgba(42,255,90,0.9)'};`;
+  document.getElementById('wrap').appendChild(el);
+  setTimeout(()=>el.style.opacity='1',30);
+  setTimeout(()=>el.style.opacity='0',warn?1200:1800);
+  setTimeout(()=>el.remove(),warn?1600:2200);
+}
+
+// ─── EFFECTS ───
+function screenShake(){
+  const s=document.getElementById('shake');
+  s.style.border='5px solid rgba(255,0,0,0.7)';
+  setTimeout(()=>s.style.border='0px solid transparent',250);
+}
+
+// 発砲時：部屋全体が一瞬明るくなるフラッシュ
+let roomFlashLight=null;
+let roomFlashAnim=null;
+function muzzleFlash(){
+  // 外枠のわずかな光縁
+  const s=document.getElementById('shake');
+  s.style.border='2px solid rgba(255,220,80,0.35)';
+  setTimeout(()=>s.style.border='0px solid transparent',60);
+
+  // Three.js: アンビエント一時増幅
+  if(ambientLight){
+    ambientLight.color.setHex(0xddcc88);
+    ambientLight.intensity=3.5;
+    setTimeout(()=>{
+      if(ambientLight){ambientLight.color.setHex(0x2a3a22);ambientLight.intensity=2.2;}
+    },55);
+  }
+
+  // Three.js: 天井からのフラッシュ全体光
+  if(!roomFlashLight){
+    roomFlashLight=new THREE.PointLight(0xffe8a0,0,50);
+    roomFlashLight.position.set(0,12,0);
+    scene.add(roomFlashLight);
+  }
+  if(roomFlashAnim)clearTimeout(roomFlashAnim);
+  roomFlashLight.intensity=28;
+  roomFlashAnim=setTimeout(()=>{if(roomFlashLight)roomFlashLight.intensity=0;},65);
+
+  // CSS: 画面全体に薄い白フラッシュオーバーレイ
+  const rf=document.getElementById('reload-flash');
+  rf.style.background='rgba(255,240,180,0.18)';
+  setTimeout(()=>rf.style.background='rgba(255,140,0,0)',80);
+}
+
+// ─── PAUSE ───
+function togglePause(){
+  if(!running)return;
+  paused=!paused;
+  const pm=document.getElementById('pause-menu');
+  const pb=document.getElementById('pause-btn');
+  if(paused){
+    pm.style.display='flex';
+    pb.textContent='▶ RESUME';
+    stopBGM();
+  } else {
+    pm.style.display='none';
+    pb.textContent='⏸ PAUSE';
+    startBGM();
+    document.getElementById('ti').focus();
+    requestAnimationFrame(loop);
+  }
+}
+
+function confirmRestart(){
+  // ポーズメニューからそのままリスタート
+  document.getElementById('pause-menu').style.display='none';
+  document.getElementById('pause-btn').classList.add('hidden');
+  paused=false;
+  running=false;
+  stopBGM();
+  startGame();
+}
+
+function goMainMenu(){
+  // ゲームを完全リセットしてタイトルへ
+  paused=false;
+  running=false;
+  stopBGM();
+  zombies.forEach(z=>scene.remove(z.mesh));
+  bullets.forEach(b=>{scene.remove(b.mesh);scene.remove(b.trail);if(b.bulletLight)scene.remove(b.bulletLight);});
+  items.forEach(it=>scene.remove(it.mesh));
+  zombies=[];bullets=[];items=[];target=null;
+  document.getElementById('labels').innerHTML='';
+  document.getElementById('pause-menu').style.display='none';
+  document.getElementById('pause-btn').classList.add('hidden');
+  // タイトルオーバーレイを表示
+  const o=document.getElementById('ov');
+  o.className='';o.style.display='flex';
+  o.innerHTML=`<h1>TYPING OF<br>THE DEAD</h1>
+    <div class="sub">— ARCADE EDITION —</div>
+    <p>ゾンビが迫ってくる！単語をタイプして倒せ！</p>
+    <p style="color:#2a5a2a;font-size:11px">TABキー → リロードモード　"reload"と入力でリロード</p>
+    <button onclick="startGame()">▶ START GAME</button>
+    <button id="rank-btn-start" onclick="openRanking()" style="font-family:'Press Start 2P',monospace;font-size:8px;padding:8px 20px;background:transparent;border:2px solid #ffcc00;color:#ffcc00;cursor:pointer;letter-spacing:1px;border-radius:2px;margin-top:2px;transition:all 0.15s;" onmouseover="this.style.background='rgba(255,204,0,0.1)'" onmouseout="this.style.background='transparent'">🏆 RANKING</button>`;
+  renderer.render(scene,camera);
+}
+
+// ESCキーでポーズトグル
+document.addEventListener('keydown',function(e){
+  if(e.key==='Escape'){
+    e.preventDefault();
+    if(running)togglePause();
+  }
+});
+
+// ─── GAME FLOW ───
+function startGame(){
+  zombies.forEach(z=>scene.remove(z.mesh));
+  bullets.forEach(b=>{scene.remove(b.mesh);scene.remove(b.trail);if(b.bulletLight)scene.remove(b.bulletLight);});
+  items.forEach(it=>scene.remove(it.mesh));
+  zombies=[];bullets=[];items=[];target=null;
+  nextItemTime=20;
+  score=0;lives=3;wave=1;waveClearing=false;
+  ammo=MAX_AMMO;
+  reloadMode=false;reloadTyped='';
+  updateHUD();
+  const iw=document.getElementById('input-wrap');
+  iw.classList.remove('reload-mode','err-mode');
+  document.getElementById('mode-badge').textContent='FIRE';
+  document.getElementById('tab-hint').textContent='[TAB] = RELOAD MODE';
+  document.getElementById('tab-hint').classList.remove('active');
+  document.getElementById('ti').placeholder='TYPE TO SHOOT';
+  document.getElementById('ov').style.display='none';
+  document.getElementById('labels').innerHTML='';
+  document.getElementById('ti').value='';
+  document.getElementById('ti').focus();
+  running=true;
+  paused=false;
+  document.getElementById('pause-btn').classList.remove('hidden');
+  document.getElementById('pause-btn').textContent='⏸ PAUSE';
+  clock.start();
+  startBGM();
+  beginWave();
+  requestAnimationFrame(loop);
+}
+
+function loop(){
+  if(!running||paused)return;
+  requestAnimationFrame(loop);
+  const elapsed=clock.getElapsedTime();
+  clock.getDelta();
+
+  if(spawnsLeft>0&&elapsed>=nextSpawnTime){
+    spawnZombie();spawnsLeft--;nextSpawnTime=elapsed+1.8;
+  }
+
+  for(let i=zombies.length-1;i>=0;i--){
+    const z=zombies[i];
+    if(!z.alive)continue;
+    z.mesh.position.z+=z.speed;
+    z.phase+=0.068;
+    const{legL,legR,lLknee,lRknee,armL,armR,aLelbow,aRelbow,headGroup,variant}=z.mesh.userData;
+    // 脚：引きずり歩き（左右非対称、ひざも曲げる）
+    legL.rotation.x=Math.sin(z.phase)*0.62;
+    legR.rotation.x=Math.sin(z.phase+Math.PI)*0.5;
+    lLknee.rotation.x=Math.max(0,Math.sin(z.phase+0.5))*0.7;
+    lRknee.rotation.x=Math.max(0,Math.sin(z.phase+Math.PI+0.5))*0.6;
+    // 腕：ゆらゆら前に垂れ下がる感じ（より激しく）
+    armL.rotation.x=-0.65+Math.sin(z.phase+Math.PI)*0.3;
+    armR.rotation.x=-0.45+Math.sin(z.phase)*0.25;
+    aLelbow.rotation.x=0.35+Math.sin(z.phase*1.4)*0.25;
+    aRelbow.rotation.x=0.25+Math.sin(z.phase*1.2)*0.2;
+    // 頭：大きくのたうつ（よりリアルな不気味さ）
+    if(headGroup){
+      headGroup.rotation.z=Math.sin(z.phase*0.6)*0.28+Math.sin(z.phase*1.3)*0.08;
+      headGroup.rotation.x=0.12+Math.sin(z.phase*0.4)*0.1;
+      headGroup.rotation.y=Math.sin(z.phase*0.8)*0.15;
+    }
+    // 体全体を左右に揺らす（よろめき＋上下）
+    z.mesh.rotation.z=Math.sin(z.phase*0.35)*0.09+Math.sin(z.phase*0.9)*0.02;
+    z.mesh.position.y=Math.abs(Math.sin(z.phase))*0.04;
+    z.mesh.rotation.y=Math.atan2(camera.position.x-z.mesh.position.x,camera.position.z-z.mesh.position.z);
+
+    if(z.mesh.position.z>0.5){
+      z.alive=false;scene.remove(z.mesh);
+      lives=Math.max(0,lives-1);updateHUD();screenShake();playHit();
+      if(target===z)setTarget(getClosest());
+      if(lives<=0){gameOver();return;}
+    }
+  }
+
+  updateBullets();
+  updateItems(elapsed);
+  if(!target||!target.alive)setTarget(getClosest()||items.find(it=>it.alive)||null);
+
+  if(spawnsLeft===0&&zombies.filter(z=>z.alive).length===0&&!waveClearing){
+    waveClearing=true;
+    setTimeout(()=>{
+      wave++;
+      // エンドレス: victoryなし、次のウェーブへ
+      items.forEach(it=>scene.remove(it.mesh));items=[];
+      zombies=[];target=null;updateHUD();beginWave();
+    },1500);
+  }
+
+  updateLabels();
+  renderer.render(scene,camera);
+}
+
+// ─── INPUT ───
+document.getElementById('ti').addEventListener('keydown',function(e){
+  if(!running)return;
+
+  // TAB → toggle reload mode
+  if(e.key==='Tab'){
+    e.preventDefault();
+    if(reloadMode){exitReloadMode();}
+    else{enterReloadMode();}
+    return;
+  }
+
+  // Block backspace always
+  if(e.key==='Backspace'){e.preventDefault();return;}
+});
+
+document.getElementById('ti').addEventListener('input',function(){
+  if(!running)return;
+
+  // ── RELOAD MODE ──
+  if(reloadMode){
+    const val=this.value.toLowerCase();
+    const expected='reload';
+    const iw=document.getElementById('input-wrap');
+
+    // check character by character
+    if(val.length<=expected.length&&expected.startsWith(val)){
+      // correct so far
+      reloadTyped=val;
+      iw.classList.remove('err-mode');
+      this.value=val;
+      if(val===expected){
+        // fully typed "reload"!
+        this.value='';
+        reloadTyped='';
+        doReload();
+      }
+    } else {
+      // wrong key
+      iw.classList.add('err-mode');
+      setTimeout(()=>iw.classList.remove('err-mode'),180);
+      this.value=reloadTyped;
+    }
+    return;
+  }
+
+  // ── FIRE MODE ──
+  // アイテムもターゲット候補に
+  if(!target||(!target.alive&&!target.isItem)){
+    setTarget(getClosest()||items.find(it=>it.alive)||null);
+    if(!target)return;
+  }
+  if(target.isItem&&!target.alive){
+    setTarget(getClosest()||items.find(it=>it.alive)||null);
+    if(!target)return;
+  }
+  const val=this.value;
+  const last=val[val.length-1];
+  if(!last)return;
+
+  // アイテムへのタイピング（弾不要）
+  if(target.isItem){
+    const iw=document.getElementById('input-wrap');
+    const expected=target.word[target.typed.length];
+    if(last===expected){
+      target.typed+=last;
+      iw.classList.remove('err-mode');
+      this.value=target.typed;
+      if(target.typed===target.word){
+        // 回復！
+        target.alive=false;scene.remove(target.mesh);
+        lives=Math.min(3,lives+1);updateHUD();
+        playHeal();
+        showBanner('♥ +1 LIFE ♥');
+        const rf=document.getElementById('reload-flash');
+        rf.style.background='rgba(255,50,100,0.18)';
+        setTimeout(()=>rf.style.background='rgba(255,140,0,0)',400);
+        const idx=items.indexOf(target);
+        if(idx>=0)items.splice(idx,1);
+        setTarget(getClosest());
+      }
+    } else {
+      iw.classList.add('err-mode');
+      setTimeout(()=>iw.classList.remove('err-mode'),180);
+      this.value=target.typed;
+    }
+    return;
+  }
+
+  if(ammo<=0){
+    this.value=target.typed;
+    playEmpty();
+    enterReloadMode();
+    return;
+  }
+
+  const expected=target.word[target.typed.length];
+  const iw=document.getElementById('input-wrap');
+  if(last===expected){
+    target.typed+=last;
+    iw.classList.remove('err-mode');
+    this.value=target.typed;
+    playGunshot();
+    muzzleFlash();
+    fireBullet(target);
+    if(target.typed===target.word){
+      const fl=new THREE.PointLight(0xffaa00,5,7);
+      fl.position.copy(target.mesh.position);fl.position.y=1;
+      scene.add(fl);setTimeout(()=>scene.remove(fl),280);
+      target.alive=false;scene.remove(target.mesh);
+      score+=target.word.length*10*wave;updateHUD();
+      setTarget(getClosest());
+    }
+  } else {
+    iw.classList.add('err-mode');
+    setTimeout(()=>iw.classList.remove('err-mode'),180);
+    this.value=target.typed;
+  }
+});
+
+function gameOver(){
+  running=false;
+  paused=false;
+  document.getElementById('pause-btn').classList.add('hidden');
+  document.getElementById('pause-menu').style.display='none';
+  stopBGM();
+  document.getElementById('labels').innerHTML='';
+  const o=document.getElementById('ov');
+  o.className='gameover';o.style.display='flex';
+  o.innerHTML=`<h1>GAME<br>OVER</h1><p>ゾンビに食われた...</p><div class="sc">SCORE: ${String(score).padStart(6,'0')}</div><p style="color:#5a2a2a;font-family:'Press Start 2P',monospace;font-size:8px">WAVE ${wave} まで到達</p><button onclick="startGame()">▶ RETRY</button>`;
+  // ランキング登録フロー
+  setTimeout(()=>showNameModal(score,wave),600);
+}
+function victory(){
+  running=false;
+  stopBGM();
+  document.getElementById('labels').innerHTML='';
+  const o=document.getElementById('ov');
+  o.className='';o.style.display='flex';
+  o.innerHTML=`<h1>MISSION<br>COMPLETE</h1><p>全ゾンビ撃退！</p><div class="sc">SCORE: ${String(score).padStart(6,'0')}</div><button onclick="startGame()">▶ PLAY AGAIN</button>`;
+  setTimeout(()=>showNameModal(score,wave),600);
+}
+
+
+// ─── SUPABASE CONFIG ───
+// ★ここにあなたのSupabase URLとanon keyを入れてください★
+const SUPABASE_URL = 'https://YOUR_PROJECT.supabase.co';
+const SUPABASE_ANON_KEY = 'YOUR_ANON_KEY';
+
+const SUPABASE_HEADERS = {
+  'Content-Type': 'application/json',
+  'apikey': SUPABASE_ANON_KEY,
+  'Authorization': 'Bearer ' + SUPABASE_ANON_KEY,
+  'Prefer': 'return=representation'
+};
+
+// ─── RANKING STATE ───
+let currentTab='all';
+let pendingScore=null;
+let pendingWave=null;
+let savedPlayerName=localStorage.getItem('zombie_player_name')||'';
+
+// ─── SUPABASE API ───
+async function fetchRanking(period){
+  let url=SUPABASE_URL+'/rest/v1/scores?select=*&order=score.desc&limit=20';
+  const now=new Date();
+  if(period==='weekly'){
+    const w=new Date(now);w.setDate(w.getDate()-7);
+    url+=`&created_at=gte.${w.toISOString()}`;
+  } else if(period==='monthly'){
+    const m=new Date(now);m.setMonth(m.getMonth()-1);
+    url+=`&created_at=gte.${m.toISOString()}`;
+  }
+  try{
+    const res=await fetch(url,{headers:SUPABASE_HEADERS});
+    if(!res.ok)throw new Error('fetch error');
+    return await res.json();
+  }catch(e){return null;}
+}
+
+async function postScore(name,sc,wv){
+  const url=SUPABASE_URL+'/rest/v1/scores';
+  try{
+    const res=await fetch(url,{
+      method:'POST',
+      headers:SUPABASE_HEADERS,
+      body:JSON.stringify({player_name:name,score:sc,wave:wv})
+    });
+    return res.ok;
+  }catch(e){return false;}
+}
+
+// ─── RANKING UI ───
+function switchTab(tab){
+  currentTab=tab;
+  document.querySelectorAll('.rank-tab').forEach(t=>t.classList.remove('active'));
+  const idx={all:0,monthly:1,weekly:2}[tab];
+  document.querySelectorAll('.rank-tab')[idx].classList.add('active');
+  loadRanking(tab);
+}
+
+async function loadRanking(period){
+  const tbody=document.getElementById('rank-body');
+  const status=document.getElementById('rank-status');
+  tbody.innerHTML='<tr><td colspan="5" style="text-align:center;color:#2a5a2a;padding:20px">Loading...</td></tr>';
+  status.textContent='';
+
+  if(SUPABASE_URL.includes('YOUR_PROJECT')){
+    tbody.innerHTML='<tr><td colspan="5" style="text-align:center;color:#5a3a2a;padding:20px">⚠ Supabase未設定<br><span style="font-size:11px;color:#3a2a1a">SUPABASE_URL / ANON_KEYを設定してください</span></td></tr>';
+    return;
+  }
+
+  const rows=await fetchRanking(period);
+  if(!rows){
+    tbody.innerHTML='<tr><td colspan="5" style="text-align:center;color:#5a3a2a;padding:20px">接続エラー</td></tr>';
+    return;
+  }
+  if(rows.length===0){
+    tbody.innerHTML='<tr><td colspan="5" style="text-align:center;color:#2a5a2a;padding:20px">まだスコアなし — 最初のチャンピオンになれ！</td></tr>';
+    return;
+  }
+
+  const medals=['🥇','🥈','🥉'];
+  tbody.innerHTML=rows.map((r,i)=>{
+    const isMe=r.player_name===savedPlayerName&&savedPlayerName!=='';
+    const rank=i<3?`<span class="rank-medal">${medals[i]}</span>`:`<b>#${i+1}</b>`;
+    const date=new Date(r.created_at).toLocaleDateString('ja-JP',{month:'2-digit',day:'2-digit'});
+    return `<tr${isMe?' class="me"':''}>
+      <td>${rank}</td>
+      <td>${r.player_name||'???'}</td>
+      <td><b>${String(r.score).padStart(6,'0')}</b></td>
+      <td>WAVE ${r.wave}</td>
+      <td>${date}</td>
+    </tr>`;
+  }).join('');
+}
+
+function openRanking(){
+  document.getElementById('ranking-panel').style.display='flex';
+  loadRanking(currentTab);
+}
+function closeRanking(){
+  document.getElementById('ranking-panel').style.display='none';
+}
+
+// ─── SCORE SUBMISSION ───
+function showNameModal(sc,wv){
+  pendingScore=sc;pendingWave=wv;
+  document.getElementById('nm-score').textContent='SCORE: '+String(sc).padStart(6,'0')+' / WAVE '+wv;
+  document.getElementById('player-name-input').value=savedPlayerName;
+  document.getElementById('name-modal').style.display='flex';
+  setTimeout(()=>document.getElementById('player-name-input').focus(),100);
+}
+
+async function submitScore(){
+  const nameEl=document.getElementById('player-name-input');
+  const name=nameEl.value.trim().slice(0,12)||'UNKNOWN';
+  savedPlayerName=name;
+  localStorage.setItem('zombie_player_name',name);
+  document.getElementById('name-modal').style.display='none';
+  const ok=await postScore(name,pendingScore,pendingWave);
+  pendingScore=null;pendingWave=null;
+  showGameOverWithRanking(ok?'✦ 登録完了！ ✦':'⚠ 登録失敗（接続確認）');
+}
+
+function skipRanking(){
+  document.getElementById('name-modal').style.display='none';
+  pendingScore=null;pendingWave=null;
+}
+
+function showGameOverWithRanking(msg){
+  // ランキングボタンをoverlayに追加
+  const o=document.getElementById('ov');
+  if(!o.querySelector('#rank-btn')){
+    const btn=document.createElement('button');
+    btn.id='rank-btn';
+    btn.textContent='🏆 RANKING';
+    btn.onclick=openRanking;
+    o.appendChild(btn);
+  }
+  if(msg){
+    const p=document.createElement('p');
+    p.style.cssText='font-size:10px;color:#2aff5a;font-family:"Press Start 2P",monospace;margin-top:4px;';
+    p.textContent=msg;
+    o.appendChild(p);
+  }
+}
+
+// Enterキーで名前登録
+document.addEventListener('DOMContentLoaded',()=>{
+  const ni=document.getElementById('player-name-input');
+  if(ni)ni.addEventListener('keydown',e=>{if(e.key==='Enter')submitScore();});
+});
+
+// ─── BOOT ───
+init();
+renderer.render(scene,camera);
+</script>
+</body>
+</html>
