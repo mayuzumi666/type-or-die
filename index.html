@@ -1803,8 +1803,8 @@ function victory(){
 
 // ─── SUPABASE CONFIG ───
 // ★ここにあなたのSupabase URLとanon keyを入れてください★
-const SUPABASE_URL = 'https://YOUR_PROJECT.supabase.co';
-const SUPABASE_ANON_KEY = 'YOUR_ANON_KEY';
+const SUPABASE_URL = 'https://ojlmeetytazclmhandjh.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_7FbDZKNdKCZ9HW9xMwRNyA_Vn-8kHC2';
 
 const SUPABASE_HEADERS = {
   'Content-Type': 'application/json',
@@ -1820,6 +1820,12 @@ let pendingWave=null;
 let savedPlayerName=localStorage.getItem('zombie_player_name')||'';
 
 // ─── SUPABASE API ───
+function getBrowserId(){
+  let id=localStorage.getItem('zombie_browser_id');
+  if(!id){id=crypto.randomUUID();localStorage.setItem('zombie_browser_id',id);}
+  return id;
+}
+
 async function fetchRanking(period){
   let url=SUPABASE_URL+'/rest/v1/scores?select=*&order=score.desc&limit=20';
   const now=new Date();
@@ -1839,14 +1845,25 @@ async function fetchRanking(period){
 
 async function postScore(name,sc,wv){
   const url=SUPABASE_URL+'/rest/v1/scores';
+  const browserId=getBrowserId();
   try{
+    // まず既存スコアを確認
+    const checkRes=await fetch(url+`?browser_id=eq.${browserId}&select=score`,{headers:SUPABASE_HEADERS});
+    if(checkRes.ok){
+      const existing=await checkRes.json();
+      if(existing.length>0&&existing[0].score>=sc){
+        // 既存スコアの方が高い→登録しない
+        return 'lower';
+      }
+    }
+    // upsert（新規 or スコア更新）
     const res=await fetch(url,{
       method:'POST',
-      headers:SUPABASE_HEADERS,
-      body:JSON.stringify({player_name:name,score:sc,wave:wv})
+      headers:{...SUPABASE_HEADERS,'Prefer':'resolution=merge-duplicates,return=representation'},
+      body:JSON.stringify({browser_id:browserId,player_name:name,score:sc,wave:wv})
     });
-    return res.ok;
-  }catch(e){return false;}
+    return res.ok?'ok':'error';
+  }catch(e){return 'error';}
 }
 
 // ─── RANKING UI ───
@@ -1917,9 +1934,11 @@ async function submitScore(){
   savedPlayerName=name;
   localStorage.setItem('zombie_player_name',name);
   document.getElementById('name-modal').style.display='none';
-  const ok=await postScore(name,pendingScore,pendingWave);
+  const result=await postScore(name,pendingScore,pendingWave);
   pendingScore=null;pendingWave=null;
-  showGameOverWithRanking(ok?'✦ 登録完了！ ✦':'⚠ 登録失敗（接続確認）');
+  if(result==='ok')showGameOverWithRanking('✦ 登録完了！ ✦');
+  else if(result==='lower')showGameOverWithRanking('⚠ 自己ベスト未更新');
+  else showGameOverWithRanking('⚠ 登録失敗（接続確認）');
 }
 
 function skipRanking(){
