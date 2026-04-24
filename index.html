@@ -202,6 +202,17 @@ body{background:#000;display:flex;align-items:center;justify-content:center;min-
 #ti::placeholder{color:#1a5a2a;letter-spacing:1px;font-size:13px}
 #input-wrap.reload-mode #ti::placeholder{color:#7a4000}
 
+/* AMMO EMPTY indicator */
+#ammo-empty-hint{
+  font-family:'Press Start 2P',monospace;font-size:8px;color:#ff8c00;
+  margin-top:4px;letter-spacing:1px;
+  display:none;
+  text-shadow:0 0 8px rgba(255,140,0,0.8);
+  animation:blink-warn 0.6s step-end infinite;
+}
+@keyframes blink-warn{50%{opacity:0}}
+#ammo-empty-hint.visible{display:block}
+
 /* TAB hint */
 #tab-hint{
   font-family:'Press Start 2P',monospace;font-size:7px;color:#333;
@@ -470,6 +481,7 @@ body{background:#000;display:flex;align-items:center;justify-content:center;min-
       <div id="mode-badge">FIRE</div>
       <input id="ti" type="text" placeholder="TYPE TO SHOOT" autocomplete="off" spellcheck="false"/>
     </div>
+    <div id="ammo-empty-hint">!! AMMO EMPTY — [TAB] to RELOAD !!</div>
     <div id="tab-hint">[TAB] = RELOAD MODE</div>
   </div>
 
@@ -532,25 +544,19 @@ function playGunshot(){
     const ctx=getAudio();
     const now=ctx.currentTime;
     const sr=ctx.sampleRate;
-
-    // ── 1. ノイズバースト（爆発的な炸薬音）──
     const burstDur=0.08;
     const burstBuf=ctx.createBuffer(1,Math.ceil(sr*burstDur),sr);
     const bd=burstBuf.getChannelData(0);
     for(let i=0;i<bd.length;i++){
       const t=i/sr;
-      // 急激な立ち上がり、指数減衰
       const env=Math.exp(-t*80);
       bd[i]=(Math.random()*2-1)*env*2.0;
     }
     const burstSrc=ctx.createBufferSource();burstSrc.buffer=burstBuf;
-    // ローパスで銃口っぽい丸みを出す
     const burstLP=ctx.createBiquadFilter();burstLP.type='lowpass';burstLP.frequency.value=3500;burstLP.Q.value=0.8;
     const burstG=ctx.createGain();burstG.gain.value=2.2;
     burstSrc.connect(burstLP);burstLP.connect(burstG);burstG.connect(ctx.destination);
     burstSrc.start(now);
-
-    // ── 2. 低音ボディ（チャンバー圧力）──
     const bodyOsc=ctx.createOscillator();
     bodyOsc.type='sine';
     bodyOsc.frequency.setValueAtTime(80,now);
@@ -560,24 +566,19 @@ function playGunshot(){
     bodyG.gain.exponentialRampToValueAtTime(0.001,now+0.18);
     bodyOsc.connect(bodyG);bodyG.connect(ctx.destination);
     bodyOsc.start(now);bodyOsc.stop(now+0.22);
-
   }catch(e){}
 }
 
 function playHit(){
-  // ゾンビにかじられた音：ガリッ→うめき声風
   try{
     const ctx=getAudio();
     const now=ctx.currentTime;
-
-    // 1. ガリッ：骨を噛む低いクランチノイズ
     const crunchDur=0.18;
     const crunchBuf=ctx.createBuffer(1,Math.ceil(ctx.sampleRate*crunchDur),ctx.sampleRate);
     const cd=crunchBuf.getChannelData(0);
     for(let i=0;i<cd.length;i++){
       const t=i/ctx.sampleRate;
       const env=Math.pow(1-t/crunchDur,1.5);
-      // ざらついたノイズ＋低音トーンで肉を噛む感じ
       cd[i]=((Math.random()*2-1)*0.7+(Math.random()>0.92?1:-1)*0.5)*env;
     }
     const crunchSrc=ctx.createBufferSource();crunchSrc.buffer=crunchBuf;
@@ -586,8 +587,6 @@ function playHit(){
     const crunchGain=ctx.createGain();crunchGain.gain.value=0.8;
     crunchSrc.connect(crunchFilt);crunchFilt.connect(crunchGain);crunchGain.connect(ctx.destination);
     crunchSrc.start(now);
-
-    // 2. ゾンビのうめき（低いうなり）
     const groanOsc=ctx.createOscillator();
     groanOsc.type='sawtooth';
     groanOsc.frequency.setValueAtTime(90,now+0.05);
@@ -600,8 +599,6 @@ function playHit(){
     groanFilt.type='bandpass';groanFilt.frequency.value=200;groanFilt.Q.value=2;
     groanOsc.connect(groanFilt);groanFilt.connect(groanGain);groanGain.connect(ctx.destination);
     groanOsc.start(now+0.05);groanOsc.stop(now+0.45);
-
-    // 3. ダメージ衝撃音（ドスッ）
     const impBuf=ctx.createBuffer(1,Math.ceil(ctx.sampleRate*0.08),ctx.sampleRate);
     const id=impBuf.getChannelData(0);
     for(let i=0;i<id.length;i++){
@@ -619,7 +616,6 @@ function playHit(){
 function playReload(){
   try{
     const ctx=getAudio();
-    // click-clack reload sound
     [0,0.06,0.12,0.22].forEach(delay=>{
       const buf=ctx.createBuffer(1,ctx.sampleRate*0.05,ctx.sampleRate);
       const d=buf.getChannelData(0);
@@ -635,12 +631,10 @@ function playReload(){
 }
 
 function playEmpty(){
-  // カチカチカチ — 3連続の乾いた空撃ち音
   try{
     const ctx=getAudio();
     const clickCount=3;
-    const clickGap=0.07; // 70ms間隔
-
+    const clickGap=0.07;
     for(let c=0;c<clickCount;c++){
       const startTime=ctx.currentTime+c*clickGap;
       const dur=0.03;
@@ -648,7 +642,6 @@ function playEmpty(){
       const d=buf.getChannelData(0);
       for(let i=0;i<d.length;i++){
         const t=i/ctx.sampleRate;
-        // 金属的なクリック音：高周波ノイズ + トーン、急速に減衰
         const env=Math.exp(-t*300);
         const tone=Math.sin(2*Math.PI*3200*t)*0.4+Math.sin(2*Math.PI*1800*t)*0.3;
         const noise=(Math.random()*2-1)*0.5;
@@ -656,7 +649,6 @@ function playEmpty(){
       }
       const src=ctx.createBufferSource();src.buffer=buf;
       const g=ctx.createGain();
-      // 後ろになるほど少し小さく（ガス欠感）
       g.gain.value=0.7-c*0.15;
       const hp=ctx.createBiquadFilter();
       hp.type='highpass';hp.frequency.value=1200;
@@ -666,8 +658,6 @@ function playEmpty(){
   }catch(e){}
 }
 
-
-// ─── HEAL SOUND ───
 function playHeal(){
   try{
     const ctx=getAudio();
@@ -698,7 +688,6 @@ function makeHeartModel(){
   body.rotation.z=Math.PI;body.position.set(0,-0.06,0);g.add(body);
   const ringMat=new THREE.MeshBasicMaterial({color:0xff88aa,transparent:true,opacity:0.6,wireframe:true});
   const ring=new THREE.Mesh(new THREE.TorusGeometry(0.38,0.04,6,12),ringMat);g.add(ring);
-  // ポイントライト（赤い発光）
   const pl=new THREE.PointLight(0xff2255,1.5,2.5);g.add(pl);
   g.userData={ring};
   return g;
@@ -743,11 +732,10 @@ function updateItems(elapsed){
   }
 }
 
-
 // ─── BGM ───
 let bgmNodes=[];let bgmCtx=null;let bgmRunning=false;
 let bgmMasterGain=null;
-let bgmVolume=0.5; // デフォルト音量
+let bgmVolume=0.5;
 
 function stopBGM(){
   bgmRunning=false;
@@ -759,7 +747,6 @@ function startBGM(){
   if(bgmRunning)return;
   bgmRunning=true;
   bgmCtx=getAudio();
-  // マスターゲイン（音量スライダー用）
   if(!bgmMasterGain){
     bgmMasterGain=bgmCtx.createGain();
     bgmMasterGain.gain.value=bgmVolume;
@@ -774,28 +761,9 @@ function scheduleBGM(){
   const bpm=148+(wave-1)*8;
   const beat=60/bpm;
   const bar=beat*4;
-
-  // ホラー感のあるマイナーペンタ進行
-  // A minor feel: A2 C3 D3 E3 G3
-  const bassNotes=[
-    55,55,55,55, 58,58,55,55,
-    52,52,52,52, 53,53,55,55
-  ]; // A1,A1,A1,A1, Bb,Bb,A,A, G#,G#,G#,G#, Ab,Ab,A,A
-
-  // メロディ（高め）
-  const melNotes=[
-    220,0,261,0, 294,0,329,0,
-    0,392,0,349, 294,0,220,0,
-    261,0,294,0, 220,0,196,0,
-    0,220,0,261, 294,349,294,220
-  ];
-
-  // パーカッション: kick=1, snare=2, hihat=3
-  const drums=[
-    1,3,2,3, 1,3,2,3,
-    1,3,2,3, 1,1,2,3
-  ];
-
+  const bassNotes=[55,55,55,55,58,58,55,55,52,52,52,52,53,53,55,55];
+  const melNotes=[220,0,261,0,294,0,329,0,0,392,0,349,294,0,220,0,261,0,294,0,220,0,196,0,0,220,0,261,294,349,294,220];
+  const drums=[1,3,2,3,1,3,2,3,1,3,2,3,1,1,2,3];
   const totalBeats=bassNotes.length;
   const now=ctx.currentTime+0.05;
 
@@ -803,16 +771,10 @@ function scheduleBGM(){
     if(!freq||!bgmRunning)return null;
     const osc=ctx.createOscillator();
     const g=ctx.createGain();
-    osc.type=type;
-    osc.frequency.value=freq;
-    osc.detune.value=detune;
-    g.gain.setValueAtTime(0,startT);
-    g.gain.linearRampToValueAtTime(vol,startT+0.01);
-    g.gain.exponentialRampToValueAtTime(0.001,startT+dur);
+    osc.type=type;osc.frequency.value=freq;osc.detune.value=detune;
+    g.gain.setValueAtTime(0,startT);g.gain.linearRampToValueAtTime(vol,startT+0.01);g.gain.exponentialRampToValueAtTime(0.001,startT+dur);
     osc.connect(g);g.connect(bgmMasterGain||ctx.destination);
-    osc.start(startT);osc.stop(startT+dur+0.05);
-    bgmNodes.push(osc);
-    return osc;
+    osc.start(startT);osc.stop(startT+dur+0.05);bgmNodes.push(osc);return osc;
   }
 
   function makeNoise(startT,dur,vol,hipass=200){
@@ -823,91 +785,58 @@ function scheduleBGM(){
     const src=ctx.createBufferSource();src.buffer=buf;
     const filt=ctx.createBiquadFilter();filt.type='highpass';filt.frequency.value=hipass;
     const g=ctx.createGain();
-    g.gain.setValueAtTime(vol,startT);
-    g.gain.exponentialRampToValueAtTime(0.001,startT+dur);
+    g.gain.setValueAtTime(vol,startT);g.gain.exponentialRampToValueAtTime(0.001,startT+dur);
     src.connect(filt);filt.connect(g);g.connect(bgmMasterGain||ctx.destination);
-    src.start(startT);src.stop(startT+dur+0.05);
-    bgmNodes.push(src);
+    src.start(startT);src.stop(startT+dur+0.05);bgmNodes.push(src);
   }
 
-  // ベースライン
   for(let i=0;i<totalBeats;i++){
     const t=now+i*beat;
     const freq=bassNotes[i%bassNotes.length];
-    makeOsc(freq,'sawtooth',t,beat*0.7,0.09);
-    makeOsc(freq*2,'sine',t,beat*0.5,0.04);
+    makeOsc(freq,'sawtooth',t,beat*0.7,0.09);makeOsc(freq*2,'sine',t,beat*0.5,0.04);
   }
-
-  // メロディ
   for(let i=0;i<melNotes.length;i++){
-    const t=now+i*(bar/8);
-    const freq=melNotes[i];
+    const t=now+i*(bar/8);const freq=melNotes[i];
     if(freq)makeOsc(freq,'square',t,bar/8*0.6,0.04,-10);
   }
-
-  // ドラム
   for(let i=0;i<totalBeats;i++){
-    const t=now+i*beat;
-    const d=drums[i%drums.length];
-    if(d===1){// kick
-      const osc=ctx.createOscillator();const g=ctx.createGain();
-      osc.frequency.setValueAtTime(120,t);osc.frequency.exponentialRampToValueAtTime(40,t+0.15);
-      g.gain.setValueAtTime(0.5,t);g.gain.exponentialRampToValueAtTime(0.001,t+0.2);
-      osc.connect(g);g.connect(bgmMasterGain||ctx.destination);osc.start(t);osc.stop(t+0.25);bgmNodes.push(osc);
-    }
-    if(d===2){// snare
-      makeNoise(t,0.12,0.18,1000);
-      makeOsc(180,'sine',t,0.08,0.12);
-    }
-    if(d===3){// hihat
-      makeNoise(t,0.04,0.07,8000);
-    }
+    const t=now+i*beat;const d=drums[i%drums.length];
+    if(d===1){const osc=ctx.createOscillator();const g=ctx.createGain();osc.frequency.setValueAtTime(120,t);osc.frequency.exponentialRampToValueAtTime(40,t+0.15);g.gain.setValueAtTime(0.5,t);g.gain.exponentialRampToValueAtTime(0.001,t+0.2);osc.connect(g);g.connect(bgmMasterGain||ctx.destination);osc.start(t);osc.stop(t+0.25);bgmNodes.push(osc);}
+    if(d===2){makeNoise(t,0.12,0.18,1000);makeOsc(180,'sine',t,0.08,0.12);}
+    if(d===3){makeNoise(t,0.04,0.07,8000);}
   }
-
-  // 1ループ後に再スケジュール
   const loopDur=totalBeats*beat;
-  setTimeout(()=>scheduleBGM(), (loopDur-0.3)*1000);
+  setTimeout(()=>scheduleBGM(),(loopDur-0.3)*1000);
 }
 
 function setBGMVolume(val){
   bgmVolume=val/100;
   if(bgmMasterGain)bgmMasterGain.gain.value=bgmVolume;
-  // スライダーのグラデーション更新
   const s=document.getElementById('bgm-slider');
   s.style.background=`linear-gradient(to right,#2aff5a 0%,#2aff5a ${val}%,#0a2a0a ${val}%,#0a2a0a 100%)`;
 }
 
 // ─── INIT THREE.JS ───
-let ambientLight=null; // 室内フラッシュ用
+let ambientLight=null;
 function init(){
   const wrap=document.getElementById('wrap');
   scene=new THREE.Scene();
   scene.background=new THREE.Color(0x050a05);
   scene.fog=new THREE.FogExp2(0x050a05,0.042);
   camera=new THREE.PerspectiveCamera(70,wrap.clientWidth/wrap.clientHeight,0.1,80);
-  camera.position.set(0,2,1);
-  camera.lookAt(0,1.5,-10);
+  camera.position.set(0,2,1);camera.lookAt(0,1.5,-10);
   renderer=new THREE.WebGLRenderer({canvas:document.getElementById('c'),antialias:true});
   renderer.setSize(wrap.clientWidth,wrap.clientHeight);
   renderer.shadowMap.enabled=true;
   clock=new THREE.Clock();
-
-  ambientLight=new THREE.AmbientLight(0x2a3a22,2.2);
-  scene.add(ambientLight);
-  const dir=new THREE.DirectionalLight(0x668855,2.2);
-  dir.position.set(3,10,-5);dir.castShadow=true;scene.add(dir);
-  const red=new THREE.PointLight(0xcc1100,6,28);
-  red.position.set(0,6,-8);scene.add(red);
-  const green=new THREE.PointLight(0x224400,5,26);
-  green.position.set(-4,3,-12);scene.add(green);
-  const red2=new THREE.PointLight(0xaa2200,4,20);
-  red2.position.set(5,2,-15);scene.add(red2);
-  const fill=new THREE.PointLight(0x334428,4,40);
-  fill.position.set(0,8,0);scene.add(fill);
-
+  ambientLight=new THREE.AmbientLight(0x2a3a22,2.2);scene.add(ambientLight);
+  const dir=new THREE.DirectionalLight(0x668855,2.2);dir.position.set(3,10,-5);dir.castShadow=true;scene.add(dir);
+  const red=new THREE.PointLight(0xcc1100,6,28);red.position.set(0,6,-8);scene.add(red);
+  const green=new THREE.PointLight(0x224400,5,26);green.position.set(-4,3,-12);scene.add(green);
+  const red2=new THREE.PointLight(0xaa2200,4,20);red2.position.set(5,2,-15);scene.add(red2);
+  const fill=new THREE.PointLight(0x334428,4,40);fill.position.set(0,8,0);scene.add(fill);
   const floor=new THREE.Mesh(new THREE.PlaneGeometry(30,60),new THREE.MeshLambertMaterial({color:0x0c180c}));
   floor.rotation.x=-Math.PI/2;floor.receiveShadow=true;scene.add(floor);
-
   for(let i=0;i<8;i++){
     const w=0.4+Math.random()*0.6,h=1.5+Math.random()*4,d=0.4+Math.random()*0.6;
     const b=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),new THREE.MeshLambertMaterial({color:0x080f08}));
@@ -915,396 +844,151 @@ function init(){
     b.castShadow=true;scene.add(b);
   }
   window.addEventListener('resize',()=>{
-    camera.aspect=wrap.clientWidth/wrap.clientHeight;
-    camera.updateProjectionMatrix();
-    renderer.setSize(wrap.clientWidth,wrap.clientHeight);
+    camera.aspect=wrap.clientWidth/wrap.clientHeight;camera.updateProjectionMatrix();renderer.setSize(wrap.clientWidth,wrap.clientHeight);
   });
 }
 
 // ─── ZOMBIE MODEL ───
 function makeZombieModel(){
   const g=new THREE.Group();
-
-  // ゾンビタイプ：0=腐敗体、1=骸骨顔、2=肥大化、3=引き裂かれた
   const variant=Math.floor(Math.random()*4);
-
-  // 腐肉色パレット — より暗く病的に
-  const skinColors=[0x3a4a28, 0x2e3d1e, 0x4a3020, 0x2d3a20];
-  const clothColors=[0x1a120a, 0x121a0a, 0x150f18, 0x0a1415];
-  const darkSkinColors=[0x283418, 0x1e2a12, 0x321e14, 0x1e2818];
-
-  const skinC=skinColors[variant];
-  const clothC=clothColors[variant];
-  const skinDarkC=darkSkinColors[variant];
-
+  const skinColors=[0x3a4a28,0x2e3d1e,0x4a3020,0x2d3a20];
+  const clothColors=[0x1a120a,0x121a0a,0x150f18,0x0a1415];
+  const darkSkinColors=[0x283418,0x1e2a12,0x321e14,0x1e2818];
+  const skinC=skinColors[variant];const clothC=clothColors[variant];const skinDarkC=darkSkinColors[variant];
   const mSkin=new THREE.MeshLambertMaterial({color:skinC});
   const mSkinDark=new THREE.MeshLambertMaterial({color:skinDarkC});
   const mCloth=new THREE.MeshLambertMaterial({color:clothC});
-  const mEyeGlow=new THREE.MeshBasicMaterial({color:0xffdd00}); // 発光する黄色い目
-  const mEyeWhite=new THREE.MeshBasicMaterial({color:0xccbbaa}); // 白目（濁り）
+  const mEyeGlow=new THREE.MeshBasicMaterial({color:0xffdd00});
+  const mEyeWhite=new THREE.MeshBasicMaterial({color:0xccbbaa});
   const mBlood=new THREE.MeshBasicMaterial({color:0x6b0000});
   const mBloodFresh=new THREE.MeshBasicMaterial({color:0x990000});
   const mBone=new THREE.MeshLambertMaterial({color:0xc8b882});
   const mBoneDark=new THREE.MeshLambertMaterial({color:0xa09060});
-  const mGore=new THREE.MeshBasicMaterial({color:0x7a1a00}); // 内臓
-
-  // スケールをランダムに（個体差）
+  const mGore=new THREE.MeshBasicMaterial({color:0x7a1a00});
   const bodyScale=0.85+Math.random()*0.45;
   const fatness=variant===2?1.35:0.9+Math.random()*0.25;
-
-  // ── 胴体（前傾み・大きめ）──
   const torsoW=0.58*fatness;const torsoH=0.8;const torsoD=0.32*fatness;
   const torso=new THREE.Mesh(new THREE.BoxGeometry(torsoW,torsoH,torsoD),mCloth);
-  torso.position.y=1.05;
-  torso.rotation.x=0.18+Math.random()*0.1; // 前のめり
-  torso.scale.set(bodyScale,bodyScale,bodyScale);
-  torso.castShadow=true;g.add(torso);
-
-  // 胸の骨が浮き出る（痩せ型）
-  if(variant!==2){
-    [-0.12,0,0.12].forEach(x=>{
-      const rib=new THREE.Mesh(new THREE.BoxGeometry(0.28,0.03,0.34),mBoneDark);
-      rib.position.set(x*fatness, 1.0+x*0.15, 0);rib.rotation.x=0.18;g.add(rib);
-    });
-  }
-
-  // 腹の大きな裂け目（内臓露出）
-  if(Math.random()>0.35){
-    const tearH=0.12+Math.random()*0.1;
-    const tear=new THREE.Mesh(new THREE.BoxGeometry(0.22*fatness,tearH,0.34*fatness),mGore);
-    tear.position.set((Math.random()-0.5)*0.12, 0.88+Math.random()*0.15, 0);
-    tear.rotation.x=0.18;g.add(tear);
-    // 血だまり（下方向）
-    const drip=new THREE.Mesh(new THREE.BoxGeometry(0.18*fatness, 0.18, 0.32*fatness),mBlood);
-    drip.position.set(tear.position.x, tear.position.y-0.14, 0);
-    drip.rotation.x=0.18;g.add(drip);
-  } else {
-    // 血の染み
-    const stain=new THREE.Mesh(new THREE.BoxGeometry(0.24*fatness,0.1,0.34*fatness),mBlood);
-    stain.position.set((Math.random()-0.5)*0.1, 0.9+Math.random()*0.2, 0);
-    stain.rotation.x=0.18;g.add(stain);
-  }
-
-  // 背中の腐敗（後ろ）
-  const backRot=new THREE.Mesh(new THREE.BoxGeometry(0.3*fatness,0.2,0.34*fatness),mBlood);
-  backRot.position.set((Math.random()-0.5)*0.1, 0.95+Math.random()*0.2, 0);
-  backRot.rotation.x=0.18;g.add(backRot);
-
-  // ── 首（細く引き延ばされた感じ）──
+  torso.position.y=1.05;torso.rotation.x=0.18+Math.random()*0.1;torso.scale.set(bodyScale,bodyScale,bodyScale);torso.castShadow=true;g.add(torso);
+  if(variant!==2){[-0.12,0,0.12].forEach(x=>{const rib=new THREE.Mesh(new THREE.BoxGeometry(0.28,0.03,0.34),mBoneDark);rib.position.set(x*fatness,1.0+x*0.15,0);rib.rotation.x=0.18;g.add(rib);});}
+  if(Math.random()>0.35){const tearH=0.12+Math.random()*0.1;const tear=new THREE.Mesh(new THREE.BoxGeometry(0.22*fatness,tearH,0.34*fatness),mGore);tear.position.set((Math.random()-0.5)*0.12,0.88+Math.random()*0.15,0);tear.rotation.x=0.18;g.add(tear);const drip=new THREE.Mesh(new THREE.BoxGeometry(0.18*fatness,0.18,0.32*fatness),mBlood);drip.position.set(tear.position.x,tear.position.y-0.14,0);drip.rotation.x=0.18;g.add(drip);}else{const stain=new THREE.Mesh(new THREE.BoxGeometry(0.24*fatness,0.1,0.34*fatness),mBlood);stain.position.set((Math.random()-0.5)*0.1,0.9+Math.random()*0.2,0);stain.rotation.x=0.18;g.add(stain);}
+  const backRot=new THREE.Mesh(new THREE.BoxGeometry(0.3*fatness,0.2,0.34*fatness),mBlood);backRot.position.set((Math.random()-0.5)*0.1,0.95+Math.random()*0.2,0);backRot.rotation.x=0.18;g.add(backRot);
   const neckTilt=(Math.random()-0.5)*0.3;
-  const neck=new THREE.Mesh(new THREE.CylinderGeometry(0.09,0.13,0.22,7),mSkinDark);
-  neck.position.y=1.52*bodyScale;neck.rotation.z=neckTilt;g.add(neck);
-
-  // 首筋の筋肉・傷
-  if(Math.random()>0.5){
-    const neckScar=new THREE.Mesh(new THREE.BoxGeometry(0.04,0.18,0.05),mBlood);
-    neckScar.position.set(0.08, 1.52*bodyScale, 0.07);g.add(neckScar);
-  }
-
-  // ── 頭部（より大きく、いびつに）──
-  const headGroup=new THREE.Group();
-  headGroup.position.y=1.72*bodyScale;
-
-  // 頭本体（いびつな形状 — 複数のボックスで構成）
+  const neck=new THREE.Mesh(new THREE.CylinderGeometry(0.09,0.13,0.22,7),mSkinDark);neck.position.y=1.52*bodyScale;neck.rotation.z=neckTilt;g.add(neck);
+  if(Math.random()>0.5){const neckScar=new THREE.Mesh(new THREE.BoxGeometry(0.04,0.18,0.05),mBlood);neckScar.position.set(0.08,1.52*bodyScale,0.07);g.add(neckScar);}
+  const headGroup=new THREE.Group();headGroup.position.y=1.72*bodyScale;
   const headW=0.42+Math.random()*0.06;const headH=0.42+Math.random()*0.05;
-  const headMesh=new THREE.Mesh(new THREE.BoxGeometry(headW,headH,0.38),mSkin);
-  headMesh.rotation.z=neckTilt*0.5+(Math.random()-0.5)*0.2;
-  headMesh.rotation.x=0.12+Math.random()*0.08;
-  headGroup.add(headMesh);
-
-  // 頬骨が出っ張る（頬）
-  [-0.18,0.18].forEach(x=>{
-    const cheek=new THREE.Mesh(new THREE.BoxGeometry(0.1,0.12,0.12),mSkin);
-    cheek.position.set(x, -0.02, 0.16);headGroup.add(cheek);
-  });
-
-  // 額の腐敗・傷
-  if(Math.random()>0.4){
-    const headWound=new THREE.Mesh(new THREE.BoxGeometry(0.14,0.08,0.05),mBlood);
-    headWound.position.set((Math.random()-0.5)*0.15, 0.14+Math.random()*0.05, 0.2);
-    headGroup.add(headWound);
-  }
-
-  // ── 目（飛び出した眼球）──
+  const headMesh=new THREE.Mesh(new THREE.BoxGeometry(headW,headH,0.38),mSkin);headMesh.rotation.z=neckTilt*0.5+(Math.random()-0.5)*0.2;headMesh.rotation.x=0.12+Math.random()*0.08;headGroup.add(headMesh);
+  [-0.18,0.18].forEach(x=>{const cheek=new THREE.Mesh(new THREE.BoxGeometry(0.1,0.12,0.12),mSkin);cheek.position.set(x,-0.02,0.16);headGroup.add(cheek);});
+  if(Math.random()>0.4){const headWound=new THREE.Mesh(new THREE.BoxGeometry(0.14,0.08,0.05),mBlood);headWound.position.set((Math.random()-0.5)*0.15,0.14+Math.random()*0.05,0.2);headGroup.add(headWound);}
   [-0.13,0.12].forEach((x,i)=>{
-    const eyeProtrude=0.03+Math.random()*0.04; // 眼球の飛び出し量
-    const eyeSize=0.06+Math.random()*0.025;
-
-    // 白目（血走り、濁った）
-    const eyeWhite=new THREE.Mesh(new THREE.BoxGeometry(eyeSize+0.04,eyeSize+0.02,eyeProtrude+0.06),mEyeWhite);
-    eyeWhite.position.set(x+(Math.random()-0.5)*0.02, 0.06+(i===0?Math.random()*0.04-0.02:0), 0.19+eyeProtrude*0.3);
-    headGroup.add(eyeWhite);
-
-    // 瞳（黄色く光る）
-    const iris=new THREE.Mesh(new THREE.BoxGeometry(eyeSize,eyeSize,eyeProtrude+0.04),mEyeGlow);
-    iris.position.set(x+(Math.random()-0.5)*0.02, 0.06+(i===0?Math.random()*0.04-0.02:0), 0.21+eyeProtrude*0.4);
-    headGroup.add(iris);
-
-    // 充血した目の縁（赤い血管）
-    const eyeVein=new THREE.Mesh(new THREE.BoxGeometry(eyeSize+0.06,eyeSize+0.04,0.02),mBloodFresh);
-    eyeVein.position.set(x+(Math.random()-0.5)*0.02, 0.06+(i===0?Math.random()*0.04-0.02:0), 0.17);
-    headGroup.add(eyeVein);
-
-    // 片目が飛び出してる個体（タイプ1）
-    if(variant===1&&i===0){
-      const bulge=new THREE.Mesh(new THREE.BoxGeometry(eyeSize+0.06,eyeSize+0.04,0.08),mEyeWhite);
-      bulge.position.set(x, 0.07, 0.23);headGroup.add(bulge);
-    }
+    const eyeProtrude=0.03+Math.random()*0.04;const eyeSize=0.06+Math.random()*0.025;
+    const eyeWhite=new THREE.Mesh(new THREE.BoxGeometry(eyeSize+0.04,eyeSize+0.02,eyeProtrude+0.06),mEyeWhite);eyeWhite.position.set(x+(Math.random()-0.5)*0.02,0.06+(i===0?Math.random()*0.04-0.02:0),0.19+eyeProtrude*0.3);headGroup.add(eyeWhite);
+    const iris=new THREE.Mesh(new THREE.BoxGeometry(eyeSize,eyeSize,eyeProtrude+0.04),mEyeGlow);iris.position.set(x+(Math.random()-0.5)*0.02,0.06+(i===0?Math.random()*0.04-0.02:0),0.21+eyeProtrude*0.4);headGroup.add(iris);
+    const eyeVein=new THREE.Mesh(new THREE.BoxGeometry(eyeSize+0.06,eyeSize+0.04,0.02),mBloodFresh);eyeVein.position.set(x+(Math.random()-0.5)*0.02,0.06+(i===0?Math.random()*0.04-0.02:0),0.17);headGroup.add(eyeVein);
+    if(variant===1&&i===0){const bulge=new THREE.Mesh(new THREE.BoxGeometry(eyeSize+0.06,eyeSize+0.04,0.08),mEyeWhite);bulge.position.set(x,0.07,0.23);headGroup.add(bulge);}
   });
-
-  // ── 鼻（腐って崩れた）──
-  if(Math.random()>0.5){
-    const nose=new THREE.Mesh(new THREE.BoxGeometry(0.07,0.06,0.08),mSkinDark);
-    nose.position.set((Math.random()-0.5)*0.04,-0.04,0.22);headGroup.add(nose);
-  } else {
-    // 鼻が欠けてる（穴だけ）
-    const nostril=new THREE.Mesh(new THREE.BoxGeometry(0.09,0.05,0.04),mBlood);
-    nostril.position.set(0,-0.04,0.2);headGroup.add(nostril);
-  }
-
-  // ── 口（大きく開いた顎）──
-  // 下顎（外れかけ）
-  const jawDrop=0.06+Math.random()*0.08; // 顎の開き
-  const jaw=new THREE.Mesh(new THREE.BoxGeometry(0.3,0.1,0.3),mSkinDark);
-  jaw.position.set(0,-0.18-jawDrop,0.04);jaw.rotation.x=0.15+jawDrop;
-  headGroup.add(jaw);
-
-  // 口の空洞（暗い穴）
-  const mouth=new THREE.Mesh(new THREE.BoxGeometry(0.24,0.1,0.05),mBlood);
-  mouth.position.set(0,-0.14-jawDrop*0.5,0.2);headGroup.add(mouth);
-
-  // 上の歯
-  [-0.09,-0.05,-0.01,0.03,0.07].forEach(x=>{
-    if(Math.random()>0.25){
-      const toothH=0.05+Math.random()*0.04;
-      const tooth=new THREE.Mesh(new THREE.BoxGeometry(0.04,toothH,0.04),mBone);
-      tooth.position.set(x,-0.1,0.2);
-      tooth.rotation.z=(Math.random()-0.5)*0.3;
-      headGroup.add(tooth);
-    }
-  });
-  // 下の歯（顎に付いてる）
-  [-0.08,-0.03,0.02,0.07].forEach(x=>{
-    if(Math.random()>0.3){
-      const tooth=new THREE.Mesh(new THREE.BoxGeometry(0.035,0.04+Math.random()*0.03,0.035),mBone);
-      tooth.position.set(x,-0.18-jawDrop+0.04,0.2);
-      tooth.rotation.x=0.15+jawDrop;
-      headGroup.add(tooth);
-    }
-  });
-
-  // 舌（腐った黒ずんだ色）
-  if(Math.random()>0.5){
-    const tongue=new THREE.Mesh(new THREE.BoxGeometry(0.1,0.04,0.12),
-      new THREE.MeshLambertMaterial({color:0x6a1a2a}));
-    tongue.position.set(0,-0.16-jawDrop,0.18);tongue.rotation.x=0.3+jawDrop;
-    headGroup.add(tongue);
-  }
-
-  // 口から垂れる血
-  const bloodDrip=new THREE.Mesh(new THREE.BoxGeometry(0.08+Math.random()*0.08,0.12+Math.random()*0.08,0.04),mBloodFresh);
-  bloodDrip.position.set((Math.random()-0.5)*0.06,-0.28-jawDrop,0.18);headGroup.add(bloodDrip);
-
-  // 頬の大きな裂傷（骨が見える）
-  if(Math.random()>0.4){
-    const cheekTear=new THREE.Mesh(new THREE.BoxGeometry(0.14,0.06,0.06),mBlood);
-    cheekTear.position.set((Math.random()>0.5?1:-1)*0.17, -0.02+Math.random()*0.06, 0.2);
-    headGroup.add(cheekTear);
-    // 裂傷内の骨
-    const cheekBone=new THREE.Mesh(new THREE.BoxGeometry(0.08,0.04,0.04),mBone);
-    cheekBone.position.set(cheekTear.position.x*0.9, cheekTear.position.y, 0.21);
-    headGroup.add(cheekBone);
-  }
-
+  if(Math.random()>0.5){const nose=new THREE.Mesh(new THREE.BoxGeometry(0.07,0.06,0.08),mSkinDark);nose.position.set((Math.random()-0.5)*0.04,-0.04,0.22);headGroup.add(nose);}else{const nostril=new THREE.Mesh(new THREE.BoxGeometry(0.09,0.05,0.04),mBlood);nostril.position.set(0,-0.04,0.2);headGroup.add(nostril);}
+  const jawDrop=0.06+Math.random()*0.08;
+  const jaw=new THREE.Mesh(new THREE.BoxGeometry(0.3,0.1,0.3),mSkinDark);jaw.position.set(0,-0.18-jawDrop,0.04);jaw.rotation.x=0.15+jawDrop;headGroup.add(jaw);
+  const mouth=new THREE.Mesh(new THREE.BoxGeometry(0.24,0.1,0.05),mBlood);mouth.position.set(0,-0.14-jawDrop*0.5,0.2);headGroup.add(mouth);
+  [-0.09,-0.05,-0.01,0.03,0.07].forEach(x=>{if(Math.random()>0.25){const toothH=0.05+Math.random()*0.04;const tooth=new THREE.Mesh(new THREE.BoxGeometry(0.04,toothH,0.04),mBone);tooth.position.set(x,-0.1,0.2);tooth.rotation.z=(Math.random()-0.5)*0.3;headGroup.add(tooth);}});
+  [-0.08,-0.03,0.02,0.07].forEach(x=>{if(Math.random()>0.3){const tooth=new THREE.Mesh(new THREE.BoxGeometry(0.035,0.04+Math.random()*0.03,0.035),mBone);tooth.position.set(x,-0.18-jawDrop+0.04,0.2);tooth.rotation.x=0.15+jawDrop;headGroup.add(tooth);}});
+  if(Math.random()>0.5){const tongue=new THREE.Mesh(new THREE.BoxGeometry(0.1,0.04,0.12),new THREE.MeshLambertMaterial({color:0x6a1a2a}));tongue.position.set(0,-0.16-jawDrop,0.18);tongue.rotation.x=0.3+jawDrop;headGroup.add(tongue);}
+  const bloodDrip=new THREE.Mesh(new THREE.BoxGeometry(0.08+Math.random()*0.08,0.12+Math.random()*0.08,0.04),mBloodFresh);bloodDrip.position.set((Math.random()-0.5)*0.06,-0.28-jawDrop,0.18);headGroup.add(bloodDrip);
+  if(Math.random()>0.4){const cheekTear=new THREE.Mesh(new THREE.BoxGeometry(0.14,0.06,0.06),mBlood);cheekTear.position.set((Math.random()>0.5?1:-1)*0.17,-0.02+Math.random()*0.06,0.2);headGroup.add(cheekTear);const cheekBone=new THREE.Mesh(new THREE.BoxGeometry(0.08,0.04,0.04),mBone);cheekBone.position.set(cheekTear.position.x*0.9,cheekTear.position.y,0.21);headGroup.add(cheekBone);}
   g.add(headGroup);
-
-  // ── 髪（ボサボサ、ところどころ剥がれた）──
-  const hairColor=Math.random()>0.5?0x0f0a04:0x1a1818;
-  const hairMat=new THREE.MeshLambertMaterial({color:hairColor});
+  const hairColor=Math.random()>0.5?0x0f0a04:0x1a1818;const hairMat=new THREE.MeshLambertMaterial({color:hairColor});
   const hairCount=Math.floor(4+Math.random()*5);
-  for(let i=0;i<hairCount;i++){
-    const hw=0.07+Math.random()*0.1;const hh=0.08+Math.random()*0.14;
-    const hair=new THREE.Mesh(new THREE.BoxGeometry(hw,hh,0.08),hairMat);
-    hair.position.set((Math.random()-0.5)*0.38, 1.96*bodyScale+Math.random()*0.08, (Math.random()-0.5)*0.22);
-    hair.rotation.z=(Math.random()-0.5)*0.6;
-    hair.rotation.x=(Math.random()-0.5)*0.3;
-    g.add(hair);
-  }
-  // 頭皮の剥がれ（血）
-  if(Math.random()>0.5){
-    const scalp=new THREE.Mesh(new THREE.BoxGeometry(0.14,0.06,0.14),mBlood);
-    scalp.position.set((Math.random()-0.5)*0.18, 1.94*bodyScale, (Math.random()-0.5)*0.12);
-    g.add(scalp);
-  }
-
-  // ── 脚（引きずり、非対称、ボロいズボン）──
-  const legScaleL=0.92+Math.random()*0.12;
-  const legScaleR=0.92+Math.random()*0.12;
-
+  for(let i=0;i<hairCount;i++){const hw=0.07+Math.random()*0.1;const hh=0.08+Math.random()*0.14;const hair=new THREE.Mesh(new THREE.BoxGeometry(hw,hh,0.08),hairMat);hair.position.set((Math.random()-0.5)*0.38,1.96*bodyScale+Math.random()*0.08,(Math.random()-0.5)*0.22);hair.rotation.z=(Math.random()-0.5)*0.6;hair.rotation.x=(Math.random()-0.5)*0.3;g.add(hair);}
+  if(Math.random()>0.5){const scalp=new THREE.Mesh(new THREE.BoxGeometry(0.14,0.06,0.14),mBlood);scalp.position.set((Math.random()-0.5)*0.18,1.94*bodyScale,(Math.random()-0.5)*0.12);g.add(scalp);}
   const legL=new THREE.Group();legL.position.set(-0.17*fatness,0.62*bodyScale,0);
   const lLupper=new THREE.Mesh(new THREE.BoxGeometry(0.24*fatness,0.42,0.24*fatness),mCloth);lLupper.position.y=-0.21;legL.add(lLupper);
-  // 膝の骨が露出
-  if(Math.random()>0.5){
-    const kneeBone=new THREE.Mesh(new THREE.BoxGeometry(0.14,0.08,0.08),mBone);
-    kneeBone.position.set(0,-0.4,0.1);legL.add(kneeBone);
-  }
+  if(Math.random()>0.5){const kneeBone=new THREE.Mesh(new THREE.BoxGeometry(0.14,0.08,0.08),mBone);kneeBone.position.set(0,-0.4,0.1);legL.add(kneeBone);}
   const lLknee=new THREE.Group();lLknee.position.y=-0.42;
   const lLlower=new THREE.Mesh(new THREE.BoxGeometry(0.2*fatness,0.38,0.2*fatness),mCloth);lLlower.position.y=-0.19;lLknee.add(lLlower);
-  // 脚の傷
   if(Math.random()>0.5){const legWound=new THREE.Mesh(new THREE.BoxGeometry(0.22*fatness,0.08,0.22*fatness),mBlood);legWound.position.y=-0.12;lLknee.add(legWound);}
   const lLfoot=new THREE.Mesh(new THREE.BoxGeometry(0.22,0.12,0.32),mSkinDark);lLfoot.position.set(0.02,-0.4,0.06);lLknee.add(lLfoot);
-  // 足の爪
-  [-0.06,-0.02,0.03,0.07].forEach(x=>{
-    if(Math.random()>0.4){const toenail=new THREE.Mesh(new THREE.BoxGeometry(0.04,0.03,0.06),mBoneDark);toenail.position.set(x,-0.44,0.2);lLknee.add(toenail);}
-  });
+  [-0.06,-0.02,0.03,0.07].forEach(x=>{if(Math.random()>0.4){const toenail=new THREE.Mesh(new THREE.BoxGeometry(0.04,0.03,0.06),mBoneDark);toenail.position.set(x,-0.44,0.2);lLknee.add(toenail);}});
   legL.add(lLknee);g.add(legL);
-
   const legR=new THREE.Group();legR.position.set(0.17*fatness,0.62*bodyScale,0);
   const lRupper=new THREE.Mesh(new THREE.BoxGeometry(0.24*fatness,0.42,0.24*fatness),mCloth);lRupper.position.y=-0.21;legR.add(lRupper);
   const lRknee=new THREE.Group();lRknee.position.y=-0.42;
   const lRlower=new THREE.Mesh(new THREE.BoxGeometry(0.2*fatness,0.38,0.2*fatness),mCloth);lRlower.position.y=-0.19;lRknee.add(lRlower);
   const lRfoot=new THREE.Mesh(new THREE.BoxGeometry(0.22,0.12,0.32),mSkinDark);lRfoot.position.set(-0.02,-0.4,0.06);lRknee.add(lRfoot);
   legR.add(lRknee);g.add(legR);
-
-  // ── 腕（より長く、爪が伸びた）──
-  const armL=new THREE.Group();armL.position.set(-0.40*fatness,1.12*bodyScale,0);
-  armL.rotation.x=-0.65;armL.rotation.z=0.2;
+  const armL=new THREE.Group();armL.position.set(-0.40*fatness,1.12*bodyScale,0);armL.rotation.x=-0.65;armL.rotation.z=0.2;
   const aLupper=new THREE.Mesh(new THREE.BoxGeometry(0.19*fatness,0.42,0.19*fatness),mCloth);aLupper.position.y=-0.21;armL.add(aLupper);
-  // 二の腕の血
   if(Math.random()>0.5){const aWound=new THREE.Mesh(new THREE.BoxGeometry(0.2*fatness,0.07,0.2*fatness),mBlood);aWound.position.y=-0.15;armL.add(aWound);}
   const aLelbow=new THREE.Group();aLelbow.position.y=-0.42;
   const aLlower=new THREE.Mesh(new THREE.BoxGeometry(0.16*fatness,0.36,0.16*fatness),mSkin);aLlower.position.y=-0.18;aLelbow.add(aLlower);
-  // 肘の骨
   const elbowBoneL=new THREE.Mesh(new THREE.BoxGeometry(0.06,0.06,0.06),mBone);elbowBoneL.position.set(0.04,-0.02,0.08);aLelbow.add(elbowBoneL);
-  // 手（大きめの爪付き）
   const handL=new THREE.Group();handL.position.y=-0.38;
   const palmL=new THREE.Mesh(new THREE.BoxGeometry(0.18,0.14,0.12),mSkinDark);handL.add(palmL);
-  [-0.07,-0.03,0.01,0.06].forEach((x,fi)=>{
-    const flen=0.1+Math.random()*0.04;
-    const finger=new THREE.Mesh(new THREE.BoxGeometry(0.04,flen,0.04),mSkin);
-    finger.position.set(x,-0.12-flen*0.4,0.01);finger.rotation.z=(Math.random()-0.5)*0.35;
-    handL.add(finger);
-    // 長い爪（鉤爪）
-    const clawLen=0.06+Math.random()*0.05;
-    const claw=new THREE.Mesh(new THREE.BoxGeometry(0.03,clawLen,0.025),mBoneDark);
-    claw.position.set(x,-0.12-flen-clawLen*0.3,0);
-    claw.rotation.z=finger.rotation.z;claw.rotation.x=0.2;
-    handL.add(claw);
-  });
-  // 親指
-  const thumbL=new THREE.Mesh(new THREE.BoxGeometry(0.04,0.08,0.04),mSkin);
-  thumbL.position.set(-0.1,-0.1,0);thumbL.rotation.z=0.5;handL.add(thumbL);
+  [-0.07,-0.03,0.01,0.06].forEach((x,fi)=>{const flen=0.1+Math.random()*0.04;const finger=new THREE.Mesh(new THREE.BoxGeometry(0.04,flen,0.04),mSkin);finger.position.set(x,-0.12-flen*0.4,0.01);finger.rotation.z=(Math.random()-0.5)*0.35;handL.add(finger);const clawLen=0.06+Math.random()*0.05;const claw=new THREE.Mesh(new THREE.BoxGeometry(0.03,clawLen,0.025),mBoneDark);claw.position.set(x,-0.12-flen-clawLen*0.3,0);claw.rotation.z=finger.rotation.z;claw.rotation.x=0.2;handL.add(claw);});
+  const thumbL=new THREE.Mesh(new THREE.BoxGeometry(0.04,0.08,0.04),mSkin);thumbL.position.set(-0.1,-0.1,0);thumbL.rotation.z=0.5;handL.add(thumbL);
   aLelbow.add(handL);armL.add(aLelbow);g.add(armL);
-
-  const armR=new THREE.Group();armR.position.set(0.40*fatness,1.12*bodyScale,0);
-  armR.rotation.x=-0.45;armR.rotation.z=-0.25;
+  const armR=new THREE.Group();armR.position.set(0.40*fatness,1.12*bodyScale,0);armR.rotation.x=-0.45;armR.rotation.z=-0.25;
   const aRupper=new THREE.Mesh(new THREE.BoxGeometry(0.19*fatness,0.42,0.19*fatness),mCloth);aRupper.position.y=-0.21;armR.add(aRupper);
   const aRelbow=new THREE.Group();aRelbow.position.y=-0.42;
   const aRlower=new THREE.Mesh(new THREE.BoxGeometry(0.16*fatness,0.36,0.16*fatness),mSkin);aRlower.position.y=-0.18;aRelbow.add(aRlower);
   const handR=new THREE.Group();handR.position.y=-0.38;
   const palmR=new THREE.Mesh(new THREE.BoxGeometry(0.18,0.14,0.12),mSkinDark);handR.add(palmR);
-  [-0.07,-0.03,0.01,0.06].forEach((x,fi)=>{
-    const flen=0.1+Math.random()*0.04;
-    const finger=new THREE.Mesh(new THREE.BoxGeometry(0.04,flen,0.04),mSkin);
-    finger.position.set(x,-0.12-flen*0.4,0);finger.rotation.z=(Math.random()-0.5)*0.35;
-    handR.add(finger);
-    const clawLen=0.06+Math.random()*0.05;
-    const claw=new THREE.Mesh(new THREE.BoxGeometry(0.03,clawLen,0.025),mBoneDark);
-    claw.position.set(x,-0.12-flen-clawLen*0.3,0);
-    claw.rotation.z=finger.rotation.z;claw.rotation.x=0.2;
-    handR.add(claw);
-  });
-  const thumbR=new THREE.Mesh(new THREE.BoxGeometry(0.04,0.08,0.04),mSkin);
-  thumbR.position.set(0.1,-0.1,0);thumbR.rotation.z=-0.5;handR.add(thumbR);
+  [-0.07,-0.03,0.01,0.06].forEach((x,fi)=>{const flen=0.1+Math.random()*0.04;const finger=new THREE.Mesh(new THREE.BoxGeometry(0.04,flen,0.04),mSkin);finger.position.set(x,-0.12-flen*0.4,0);finger.rotation.z=(Math.random()-0.5)*0.35;handR.add(finger);const clawLen=0.06+Math.random()*0.05;const claw=new THREE.Mesh(new THREE.BoxGeometry(0.03,clawLen,0.025),mBoneDark);claw.position.set(x,-0.12-flen-clawLen*0.3,0);claw.rotation.z=finger.rotation.z;claw.rotation.x=0.2;handR.add(claw);});
+  const thumbR=new THREE.Mesh(new THREE.BoxGeometry(0.04,0.08,0.04),mSkin);thumbR.position.set(0.1,-0.1,0);thumbR.rotation.z=-0.5;handR.add(thumbR);
   aRelbow.add(handR);armR.add(aRelbow);g.add(armR);
-
-  // ── 胴体からの大きな腕の傷 ──
-  if(Math.random()>0.4){
-    const armGash=new THREE.Mesh(new THREE.BoxGeometry(0.2*fatness,0.1,0.2*fatness),mGore);
-    armGash.position.set(Math.random()>0.5?-0.42*fatness:0.42*fatness, 0.92*bodyScale, 0);g.add(armGash);
-  }
-
-  // ── 目の発光（ポイントライト）──
-  const eyeLight=new THREE.PointLight(0xffdd00,0.8,1.8);
-  eyeLight.position.set(0, headGroup.position.y+0.06, 0.25);
-  g.add(eyeLight);
-
+  if(Math.random()>0.4){const armGash=new THREE.Mesh(new THREE.BoxGeometry(0.2*fatness,0.1,0.2*fatness),mGore);armGash.position.set(Math.random()>0.5?-0.42*fatness:0.42*fatness,0.92*bodyScale,0);g.add(armGash);}
+  const eyeLight=new THREE.PointLight(0xffdd00,0.8,1.8);eyeLight.position.set(0,headGroup.position.y+0.06,0.25);g.add(eyeLight);
   g.userData={legL,legR,lLknee,lRknee,armL,armR,aLelbow,aRelbow,headGroup,variant};
   return g;
 }
 
 // ─── BULLETS ───
 function fireBullet(targetZombie){
-  if(ammo<=0){playEmpty();enterReloadMode();return;}
-  ammo--;
-  updateAmmoUI();
-  if(ammo===0){setTimeout(()=>enterReloadMode(),120);}
-
   const fromPos=new THREE.Vector3((Math.random()-0.5)*0.3,1.6+Math.random()*0.1,0.5);
-  const toPos=new THREE.Vector3(
-    targetZombie.mesh.position.x+(Math.random()-0.5)*0.15,
-    targetZombie.mesh.position.y+1.0+(Math.random()-0.5)*0.3,
-    targetZombie.mesh.position.z
-  );
+  const toPos=new THREE.Vector3(targetZombie.mesh.position.x+(Math.random()-0.5)*0.15,targetZombie.mesh.position.y+1.0+(Math.random()-0.5)*0.3,targetZombie.mesh.position.z);
   const dir=toPos.clone().sub(fromPos).normalize();
   const geo=new THREE.SphereGeometry(0.04,4,4);
   const mat=new THREE.MeshBasicMaterial({color:0xffee44});
-  const mesh=new THREE.Mesh(geo,mat);
-  mesh.position.copy(fromPos);
-  const trail=new THREE.Mesh(
-    new THREE.CylinderGeometry(0.015,0.015,0.3,4),
-    new THREE.MeshBasicMaterial({color:0xff8800,transparent:true,opacity:0.5})
-  );
+  const mesh=new THREE.Mesh(geo,mat);mesh.position.copy(fromPos);
+  const trail=new THREE.Mesh(new THREE.CylinderGeometry(0.015,0.015,0.3,4),new THREE.MeshBasicMaterial({color:0xff8800,transparent:true,opacity:0.5}));
   trail.position.copy(fromPos);
-  const axis=new THREE.Vector3(0,1,0);
-  trail.quaternion.setFromUnitVectors(axis,dir);
+  const axis=new THREE.Vector3(0,1,0);trail.quaternion.setFromUnitVectors(axis,dir);
   scene.add(mesh);scene.add(trail);
-
-  // 発射時のマズルフラッシュ光
-  const muzzleLight=new THREE.PointLight(0xffdd44,6,4);
-  muzzleLight.position.copy(fromPos);scene.add(muzzleLight);
+  const muzzleLight=new THREE.PointLight(0xffdd44,6,4);muzzleLight.position.copy(fromPos);scene.add(muzzleLight);
   setTimeout(()=>scene.remove(muzzleLight),55);
-
-  // 弾に追従するポイントライト（軌道を照らす）
-  const bulletLight=new THREE.PointLight(0xff9900,4,3.5);
-  bulletLight.position.copy(fromPos);scene.add(bulletLight);
-
+  const bulletLight=new THREE.PointLight(0xff9900,4,3.5);bulletLight.position.copy(fromPos);scene.add(bulletLight);
   bullets.push({mesh,trail,bulletLight,dir,speed:0.9,dist:fromPos.distanceTo(toPos),traveled:0,targetZ:targetZombie,alive:true});
 }
 
 function updateBullets(){
   for(let i=bullets.length-1;i>=0;i--){
-    const b=bullets[i];
-    if(!b.alive)continue;
+    const b=bullets[i];if(!b.alive)continue;
     b.traveled+=b.speed;
     b.mesh.position.addScaledVector(b.dir,b.speed);
     b.trail.position.copy(b.mesh.position).addScaledVector(b.dir,-0.15);
-    // ライトを弾頭に追従させる
     b.bulletLight.position.copy(b.mesh.position);
-    if(b.traveled>=b.dist){
-      scene.remove(b.mesh);scene.remove(b.trail);
-      scene.remove(b.bulletLight);
-      b.alive=false;
-    }
+    if(b.traveled>=b.dist){scene.remove(b.mesh);scene.remove(b.trail);scene.remove(b.bulletLight);b.alive=false;}
   }
 }
 
 // ─── AMMO UI ───
 function updateAmmoUI(){
-  // weapon bar pips
-  const bar=document.getElementById('ammo-bar');
-  bar.innerHTML='';
+  const bar=document.getElementById('ammo-bar');bar.innerHTML='';
   for(let i=0;i<MAX_AMMO;i++){
     const pip=document.createElement('div');
-    pip.className='ammo-pip'+(i>=ammo?' empty':'');
-    bar.appendChild(pip);
+    pip.className='ammo-pip'+(i>=ammo?' empty':'');bar.appendChild(pip);
   }
+  // 弾切れ警告ヒントを表示/非表示
+  const hint=document.getElementById('ammo-empty-hint');
+  if(ammo===0&&!reloadMode){hint.classList.add('visible');}
+  else{hint.classList.remove('visible');}
 }
 
 // ─── RELOAD LOGIC ───
 function enterReloadMode(){
-  reloadMode=true;
-  reloadTyped='';
+  reloadMode=true;reloadTyped='';
   const wrap=document.getElementById('input-wrap');
   wrap.classList.add('reload-mode');
   document.getElementById('mode-badge').textContent='LOAD';
@@ -1314,78 +998,63 @@ function enterReloadMode(){
   document.getElementById('ti').placeholder='reload';
   document.getElementById('reload-flash').classList.add('active');
   setTimeout(()=>document.getElementById('reload-flash').classList.remove('active'),200);
+  document.getElementById('ammo-empty-hint').classList.remove('visible');
   showBanner('── RELOAD MODE ──',true);
 }
 
 function exitReloadMode(){
-  reloadMode=false;
-  reloadTyped='';
+  reloadMode=false;reloadTyped='';
   const wrap=document.getElementById('input-wrap');
-  wrap.classList.remove('reload-mode');
-  wrap.classList.remove('err-mode');
+  wrap.classList.remove('reload-mode');wrap.classList.remove('err-mode');
   document.getElementById('mode-badge').textContent='FIRE';
   document.getElementById('tab-hint').textContent='[TAB] = RELOAD MODE';
   document.getElementById('tab-hint').classList.remove('active');
   document.getElementById('ti').value=target?target.typed:'';
   document.getElementById('ti').placeholder='TYPE TO SHOOT';
+  updateAmmoUI();
 }
 
 function doReload(){
-  playReload();
-  ammo=MAX_AMMO;
-  updateAmmoUI();
+  playReload();ammo=MAX_AMMO;updateAmmoUI();
   showBanner('✦ RELOADED! ✦');
-  const rf=document.getElementById('reload-flash');
-  rf.classList.add('active');
+  const rf=document.getElementById('reload-flash');rf.classList.add('active');
   setTimeout(()=>rf.classList.remove('active'),300);
   exitReloadMode();
 }
 
 // ─── HUD ───
 function worldToScreen(pos){
-  const v=pos.clone().project(camera);
-  const wrap=document.getElementById('wrap');
+  const v=pos.clone().project(camera);const wrap=document.getElementById('wrap');
   return{x:(v.x*0.5+0.5)*wrap.clientWidth,y:(-v.y*0.5+0.5)*wrap.clientHeight,behind:v.z>1};
 }
 
 function updateLabels(){
-  const container=document.getElementById('labels');
-  container.innerHTML='';
-  // 遠い順にソートして描画→手前のゾンビが常に上に重なる
+  const container=document.getElementById('labels');container.innerHTML='';
   const alive=zombies.filter(z=>z.alive);
   alive.sort((a,b)=>camera.position.distanceTo(b.mesh.position)-camera.position.distanceTo(a.mesh.position));
   alive.forEach((z,i)=>{
     const lp=new THREE.Vector3(z.mesh.position.x,z.mesh.position.y+2.3,z.mesh.position.z);
-    const s=worldToScreen(lp);
-    if(s.behind)return;
-    const dist=camera.position.distanceTo(z.mesh.position);
-    const scale=Math.max(0.55,Math.min(1.3,11/dist));
-    const isT=(z===target);
-    const zIdx=isT?9999:(i+1)*10;
+    const s=worldToScreen(lp);if(s.behind)return;
+    const dist=camera.position.distanceTo(z.mesh.position);const scale=Math.max(0.55,Math.min(1.3,11/dist));
+    const isT=(z===target);const zIdx=isT?9999:(i+1)*10;
     const div=document.createElement('div');
     div.style.cssText=`position:absolute;left:${s.x}px;top:${s.y}px;transform:translate(-50%,-50%) scale(${scale});white-space:nowrap;z-index:${zIdx};`;
-
     const typed=`<span style="color:#2aff5a;text-shadow:0 0 6px rgba(42,255,90,0.8)">${z.typed}</span>`;
     const rest=`<span style="color:${isT?'#fff':'#7a8a7a'}">${z.word.slice(z.typed.length)}</span>`;
-    const border=isT?'#2aff5a':'#2a5a2a';
-    const bg=isT?'rgba(0,30,10,0.97)':'rgba(0,0,0,0.88)';
+    const border=isT?'#2aff5a':'#2a5a2a';const bg=isT?'rgba(0,30,10,0.97)':'rgba(0,0,0,0.88)';
     const glow=isT?';box-shadow:0 0 12px rgba(42,255,90,0.4)':'';
     div.innerHTML=`<div style="background:${bg};border:2px solid ${border};border-radius:3px;padding:5px 14px;font-family:'Share Tech Mono',monospace;font-size:20px;letter-spacing:2px${glow}">${typed}${rest}</div><div style="width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-top:7px solid ${border};margin:0 auto"></div>`;
     container.appendChild(div);
   });
-
-  // アイテムラベル（ハート色）
   items.filter(it=>it.alive).forEach(it=>{
     const lp=new THREE.Vector3(it.mesh.position.x,it.mesh.position.y+0.9,it.mesh.position.z);
-    const s=worldToScreen(lp);
-    if(s.behind)return;
+    const s=worldToScreen(lp);if(s.behind)return;
     const isT=(it===target);
     const div=document.createElement('div');
     div.style.cssText=`position:absolute;left:${s.x}px;top:${s.y}px;transform:translate(-50%,-50%);white-space:nowrap;z-index:${isT?9998:500};`;
     const typedSpan=`<span style="color:#ff88aa;text-shadow:0 0 6px rgba(255,100,150,0.9)">${it.typed}</span>`;
     const restSpan=`<span style="color:${isT?'#ffccdd':'#884455'}">${it.word.slice(it.typed.length)}</span>`;
-    const border=isT?'#ff4477':'#882244';
-    const bg=isT?'rgba(40,0,15,0.97)':'rgba(20,0,8,0.88)';
+    const border=isT?'#ff4477':'#882244';const bg=isT?'rgba(40,0,15,0.97)':'rgba(20,0,8,0.88)';
     const glow=isT?';box-shadow:0 0 14px rgba(255,50,100,0.6)':'';
     div.innerHTML=`<div style="background:${bg};border:2px solid ${border};border-radius:3px;padding:3px 10px;font-family:'Share Tech Mono',monospace;font-size:19px;letter-spacing:2px${glow}">♥ ${typedSpan}${restSpan}</div><div style="width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;border-top:6px solid ${border};margin:0 auto"></div>`;
     container.appendChild(div);
@@ -1402,168 +1071,82 @@ function updateHUD(){
 
 // ─── SPAWN / WAVE ───
 function spawnZombie(){
-  // 現在生きているゾンビのワードと被らないように選ぶ
   const usedWords=new Set(zombies.filter(z=>z.alive).map(z=>z.word));
   const available=WORDS.filter(w=>!usedWords.has(w));
-  const pool=available.length>0?available:WORDS; // 全部被ってたら仕方なく全体から
+  const pool=available.length>0?available:WORDS;
   const word=pool[Math.floor(Math.random()*pool.length)];
   const mesh=makeZombieModel();
-  const xOff=(Math.random()-0.5)*6;
-  mesh.position.set(xOff,0,-25);
-  scene.add(mesh);
-  const speed=0.018+wave*0.003+Math.random()*0.004;  // エンドレスでも上限設定
+  const xOff=(Math.random()-0.5)*6;mesh.position.set(xOff,0,-25);scene.add(mesh);
+  const speed=0.018+wave*0.003+Math.random()*0.004;
   const z={mesh,word,typed:'',speed,alive:true,phase:Math.random()*Math.PI*2};
-  zombies.push(z);
-  if(!target)setTarget(z);
+  zombies.push(z);if(!target)setTarget(z);
 }
 
 function setTarget(z){
-  target=z;
-  if(!reloadMode)document.getElementById('ti').value=z?z.typed:'';
+  target=z;if(!reloadMode)document.getElementById('ti').value=z?z.typed:'';
 }
 
 function getClosest(){
-  const alive=zombies.filter(z=>z.alive);
-  if(!alive.length)return null;
+  const alive=zombies.filter(z=>z.alive);if(!alive.length)return null;
   return alive.reduce((a,b)=>a.mesh.position.z>b.mesh.position.z?a:b);
 }
 
 function beginWave(){
-  // エンドレス: wave数に応じてゾンビ数・難易度増加
   const baseCount=WZCOUNT[Math.min(wave-1,WZCOUNT.length-1)];
-  spawnsLeft=wave<=WZCOUNT.length ? baseCount : baseCount + Math.floor((wave-WZCOUNT.length)*1.5);
-  nextSpawnTime=clock.getElapsedTime()+1.0;
-  waveClearing=false;
-  showBanner('WAVE '+wave);
+  spawnsLeft=wave<=WZCOUNT.length?baseCount:baseCount+Math.floor((wave-WZCOUNT.length)*1.5);
+  nextSpawnTime=clock.getElapsedTime()+1.0;waveClearing=false;showBanner('WAVE '+wave);
 }
 
 // ─── BANNERS ───
 function showBanner(txt,warn=false){
   const old=document.getElementById('banner');if(old)old.remove();
-  const el=document.createElement('div');
-  el.id='banner';el.textContent=txt;
-  el.style.cssText=`position:absolute;top:42%;left:50%;transform:translate(-50%,-50%);
-    color:${warn?'#ff8c00':'#2aff5a'};font-family:'Press Start 2P',monospace;font-size:${warn?'13':'18'}px;
-    letter-spacing:3px;z-index:10;pointer-events:none;opacity:0;transition:opacity 0.25s;
-    text-shadow:0 0 20px ${warn?'rgba(255,140,0,0.9)':'rgba(42,255,90,0.9)'};`;
+  const el=document.createElement('div');el.id='banner';el.textContent=txt;
+  el.style.cssText=`position:absolute;top:42%;left:50%;transform:translate(-50%,-50%);color:${warn?'#ff8c00':'#2aff5a'};font-family:'Press Start 2P',monospace;font-size:${warn?'13':'18'}px;letter-spacing:3px;z-index:10;pointer-events:none;opacity:0;transition:opacity 0.25s;text-shadow:0 0 20px ${warn?'rgba(255,140,0,0.9)':'rgba(42,255,90,0.9)'};`;
   document.getElementById('wrap').appendChild(el);
-  setTimeout(()=>el.style.opacity='1',30);
-  setTimeout(()=>el.style.opacity='0',warn?1200:1800);
-  setTimeout(()=>el.remove(),warn?1600:2200);
+  setTimeout(()=>el.style.opacity='1',30);setTimeout(()=>el.style.opacity='0',warn?1200:1800);setTimeout(()=>el.remove(),warn?1600:2200);
 }
 
 // ─── EFFECTS ───
 function screenShake(){
-  const s=document.getElementById('shake');
-  s.style.border='5px solid rgba(255,0,0,0.7)';
-  setTimeout(()=>s.style.border='0px solid transparent',250);
+  const s=document.getElementById('shake');s.style.border='5px solid rgba(255,0,0,0.7)';setTimeout(()=>s.style.border='0px solid transparent',250);
 }
-
-// 発砲時：部屋全体が一瞬明るくなるフラッシュ
-let roomFlashLight=null;
-let roomFlashAnim=null;
+let roomFlashLight=null;let roomFlashAnim=null;
 function muzzleFlash(){
-  // 外枠のわずかな光縁
-  const s=document.getElementById('shake');
-  s.style.border='2px solid rgba(255,220,80,0.35)';
-  setTimeout(()=>s.style.border='0px solid transparent',60);
-
-  // Three.js: アンビエント一時増幅
-  if(ambientLight){
-    ambientLight.color.setHex(0xddcc88);
-    ambientLight.intensity=3.5;
-    setTimeout(()=>{
-      if(ambientLight){ambientLight.color.setHex(0x2a3a22);ambientLight.intensity=2.2;}
-    },55);
-  }
-
-  // Three.js: 天井からのフラッシュ全体光
-  if(!roomFlashLight){
-    roomFlashLight=new THREE.PointLight(0xffe8a0,0,50);
-    roomFlashLight.position.set(0,12,0);
-    scene.add(roomFlashLight);
-  }
-  if(roomFlashAnim)clearTimeout(roomFlashAnim);
-  roomFlashLight.intensity=28;
-  roomFlashAnim=setTimeout(()=>{if(roomFlashLight)roomFlashLight.intensity=0;},65);
-
-  // CSS: 画面全体に薄い白フラッシュオーバーレイ
-  const rf=document.getElementById('reload-flash');
-  rf.style.background='rgba(255,240,180,0.18)';
-  setTimeout(()=>rf.style.background='rgba(255,140,0,0)',80);
+  const s=document.getElementById('shake');s.style.border='2px solid rgba(255,220,80,0.35)';setTimeout(()=>s.style.border='0px solid transparent',60);
+  if(ambientLight){ambientLight.color.setHex(0xddcc88);ambientLight.intensity=3.5;setTimeout(()=>{if(ambientLight){ambientLight.color.setHex(0x2a3a22);ambientLight.intensity=2.2;}},55);}
+  if(!roomFlashLight){roomFlashLight=new THREE.PointLight(0xffe8a0,0,50);roomFlashLight.position.set(0,12,0);scene.add(roomFlashLight);}
+  if(roomFlashAnim)clearTimeout(roomFlashAnim);roomFlashLight.intensity=28;roomFlashAnim=setTimeout(()=>{if(roomFlashLight)roomFlashLight.intensity=0;},65);
+  const rf=document.getElementById('reload-flash');rf.style.background='rgba(255,240,180,0.18)';setTimeout(()=>rf.style.background='rgba(255,140,0,0)',80);
 }
 
 // ─── PAUSE ───
 function togglePause(){
-  if(!running)return;
-  paused=!paused;
-  const pm=document.getElementById('pause-menu');
-  const pb=document.getElementById('pause-btn');
-  if(paused){
-    pm.style.display='flex';
-    pb.textContent='▶ RESUME';
-    stopBGM();
-  } else {
-    pm.style.display='none';
-    pb.textContent='⏸ PAUSE';
-    startBGM();
-    document.getElementById('ti').focus();
-    requestAnimationFrame(loop);
-  }
+  if(!running)return;paused=!paused;
+  const pm=document.getElementById('pause-menu');const pb=document.getElementById('pause-btn');
+  if(paused){pm.style.display='flex';pb.textContent='▶ RESUME';stopBGM();}
+  else{pm.style.display='none';pb.textContent='⏸ PAUSE';startBGM();document.getElementById('ti').focus();requestAnimationFrame(loop);}
 }
-
 function confirmRestart(){
-  // ポーズメニューからそのままリスタート
-  document.getElementById('pause-menu').style.display='none';
-  document.getElementById('pause-btn').classList.add('hidden');
-  paused=false;
-  running=false;
-  stopBGM();
-  startGame();
+  document.getElementById('pause-menu').style.display='none';document.getElementById('pause-btn').classList.add('hidden');
+  paused=false;running=false;stopBGM();startGame();
 }
-
 function goMainMenu(){
-  // ゲームを完全リセットしてタイトルへ
-  paused=false;
-  running=false;
-  stopBGM();
-  zombies.forEach(z=>scene.remove(z.mesh));
-  bullets.forEach(b=>{scene.remove(b.mesh);scene.remove(b.trail);if(b.bulletLight)scene.remove(b.bulletLight);});
-  items.forEach(it=>scene.remove(it.mesh));
+  paused=false;running=false;stopBGM();
+  zombies.forEach(z=>scene.remove(z.mesh));bullets.forEach(b=>{scene.remove(b.mesh);scene.remove(b.trail);if(b.bulletLight)scene.remove(b.bulletLight);});items.forEach(it=>scene.remove(it.mesh));
   zombies=[];bullets=[];items=[];target=null;
-  document.getElementById('labels').innerHTML='';
-  document.getElementById('pause-menu').style.display='none';
-  document.getElementById('pause-btn').classList.add('hidden');
-  // タイトルオーバーレイを表示
-  const o=document.getElementById('ov');
-  o.className='';o.style.display='flex';
-  o.innerHTML=`<h1>TYPE OR<br>DIE</h1>
-    <div class="sub">— ARCADE EDITION —</div>
-    <p>ゾンビが迫ってくる！単語をタイプして倒せ！</p>
-    <p style="color:#2a5a2a;font-size:11px">TABキー → リロードモード　"reload"と入力でリロード</p>
-    <button onclick="startGame()">▶ START GAME</button>
-    <button id="rank-btn-start" onclick="openRanking()" style="font-family:'Press Start 2P',monospace;font-size:8px;padding:8px 20px;background:transparent;border:2px solid #ffcc00;color:#ffcc00;cursor:pointer;letter-spacing:1px;border-radius:2px;margin-top:2px;transition:all 0.15s;" onmouseover="this.style.background='rgba(255,204,0,0.1)'" onmouseout="this.style.background='transparent'">🏆 RANKING</button>`;
+  document.getElementById('labels').innerHTML='';document.getElementById('pause-menu').style.display='none';document.getElementById('pause-btn').classList.add('hidden');
+  const o=document.getElementById('ov');o.className='';o.style.display='flex';
+  o.innerHTML=`<h1>TYPE OR<br>DIE</h1><div class="sub">— ARCADE EDITION —</div><p>ゾンビが迫ってくる！単語をタイプして倒せ！</p><p style="color:#2a5a2a;font-size:11px">TABキー → リロードモード　"reload"と入力でリロード</p><button onclick="startGame()">▶ START GAME</button><button id="rank-btn-start" onclick="openRanking()" style="font-family:'Press Start 2P',monospace;font-size:8px;padding:8px 20px;background:transparent;border:2px solid #ffcc00;color:#ffcc00;cursor:pointer;letter-spacing:1px;border-radius:2px;margin-top:2px;transition:all 0.15s;" onmouseover="this.style.background='rgba(255,204,0,0.1)'" onmouseout="this.style.background='transparent'">🏆 RANKING</button>`;
   renderer.render(scene,camera);
 }
-
-// ESCキーでポーズトグル
-document.addEventListener('keydown',function(e){
-  if(e.key==='Escape'){
-    e.preventDefault();
-    if(running)togglePause();
-  }
-});
+document.addEventListener('keydown',function(e){if(e.key==='Escape'){e.preventDefault();if(running)togglePause();}});
 
 // ─── GAME FLOW ───
 function startGame(){
-  zombies.forEach(z=>scene.remove(z.mesh));
-  bullets.forEach(b=>{scene.remove(b.mesh);scene.remove(b.trail);if(b.bulletLight)scene.remove(b.bulletLight);});
-  items.forEach(it=>scene.remove(it.mesh));
-  zombies=[];bullets=[];items=[];target=null;
-  nextItemTime=20;
+  zombies.forEach(z=>scene.remove(z.mesh));bullets.forEach(b=>{scene.remove(b.mesh);scene.remove(b.trail);if(b.bulletLight)scene.remove(b.bulletLight);});items.forEach(it=>scene.remove(it.mesh));
+  zombies=[];bullets=[];items=[];target=null;nextItemTime=20;
   score=0;lives=3;wave=1;waveClearing=false;
-  ammo=MAX_AMMO;
-  reloadMode=false;reloadTyped='';
+  ammo=MAX_AMMO;reloadMode=false;reloadTyped='';
   updateHUD();
   const iw=document.getElementById('input-wrap');
   iw.classList.remove('reload-mode','err-mode');
@@ -1575,92 +1158,46 @@ function startGame(){
   document.getElementById('labels').innerHTML='';
   document.getElementById('ti').value='';
   document.getElementById('ti').focus();
-  running=true;
-  paused=false;
-  document.getElementById('pause-btn').classList.remove('hidden');
-  document.getElementById('pause-btn').textContent='⏸ PAUSE';
-  clock.start();
-  startBGM();
-  beginWave();
-  requestAnimationFrame(loop);
+  document.getElementById('ammo-empty-hint').classList.remove('visible');
+  running=true;paused=false;
+  document.getElementById('pause-btn').classList.remove('hidden');document.getElementById('pause-btn').textContent='⏸ PAUSE';
+  clock.start();startBGM();beginWave();requestAnimationFrame(loop);
 }
 
 function loop(){
-  if(!running||paused)return;
-  requestAnimationFrame(loop);
-  const elapsed=clock.getElapsedTime();
-  clock.getDelta();
-
-  if(spawnsLeft>0&&elapsed>=nextSpawnTime){
-    spawnZombie();spawnsLeft--;nextSpawnTime=elapsed+1.8;
-  }
-
+  if(!running||paused)return;requestAnimationFrame(loop);
+  const elapsed=clock.getElapsedTime();clock.getDelta();
+  if(spawnsLeft>0&&elapsed>=nextSpawnTime){spawnZombie();spawnsLeft--;nextSpawnTime=elapsed+1.8;}
   for(let i=zombies.length-1;i>=0;i--){
-    const z=zombies[i];
-    if(!z.alive)continue;
-    z.mesh.position.z+=z.speed;
-    z.phase+=0.068;
+    const z=zombies[i];if(!z.alive)continue;
+    z.mesh.position.z+=z.speed;z.phase+=0.068;
     const{legL,legR,lLknee,lRknee,armL,armR,aLelbow,aRelbow,headGroup,variant}=z.mesh.userData;
-    // 脚：引きずり歩き（左右非対称、ひざも曲げる）
-    legL.rotation.x=Math.sin(z.phase)*0.62;
-    legR.rotation.x=Math.sin(z.phase+Math.PI)*0.5;
-    lLknee.rotation.x=Math.max(0,Math.sin(z.phase+0.5))*0.7;
-    lRknee.rotation.x=Math.max(0,Math.sin(z.phase+Math.PI+0.5))*0.6;
-    // 腕：ゆらゆら前に垂れ下がる感じ（より激しく）
-    armL.rotation.x=-0.65+Math.sin(z.phase+Math.PI)*0.3;
-    armR.rotation.x=-0.45+Math.sin(z.phase)*0.25;
-    aLelbow.rotation.x=0.35+Math.sin(z.phase*1.4)*0.25;
-    aRelbow.rotation.x=0.25+Math.sin(z.phase*1.2)*0.2;
-    // 頭：大きくのたうつ（よりリアルな不気味さ）
-    if(headGroup){
-      headGroup.rotation.z=Math.sin(z.phase*0.6)*0.28+Math.sin(z.phase*1.3)*0.08;
-      headGroup.rotation.x=0.12+Math.sin(z.phase*0.4)*0.1;
-      headGroup.rotation.y=Math.sin(z.phase*0.8)*0.15;
-    }
-    // 体全体を左右に揺らす（よろめき＋上下）
+    legL.rotation.x=Math.sin(z.phase)*0.62;legR.rotation.x=Math.sin(z.phase+Math.PI)*0.5;
+    lLknee.rotation.x=Math.max(0,Math.sin(z.phase+0.5))*0.7;lRknee.rotation.x=Math.max(0,Math.sin(z.phase+Math.PI+0.5))*0.6;
+    armL.rotation.x=-0.65+Math.sin(z.phase+Math.PI)*0.3;armR.rotation.x=-0.45+Math.sin(z.phase)*0.25;
+    aLelbow.rotation.x=0.35+Math.sin(z.phase*1.4)*0.25;aRelbow.rotation.x=0.25+Math.sin(z.phase*1.2)*0.2;
+    if(headGroup){headGroup.rotation.z=Math.sin(z.phase*0.6)*0.28+Math.sin(z.phase*1.3)*0.08;headGroup.rotation.x=0.12+Math.sin(z.phase*0.4)*0.1;headGroup.rotation.y=Math.sin(z.phase*0.8)*0.15;}
     z.mesh.rotation.z=Math.sin(z.phase*0.35)*0.09+Math.sin(z.phase*0.9)*0.02;
     z.mesh.position.y=Math.abs(Math.sin(z.phase))*0.04;
     z.mesh.rotation.y=Math.atan2(camera.position.x-z.mesh.position.x,camera.position.z-z.mesh.position.z);
-
     if(z.mesh.position.z>0.5){
-      z.alive=false;scene.remove(z.mesh);
-      lives=Math.max(0,lives-1);updateHUD();screenShake();playHit();
-      if(target===z)setTarget(getClosest());
-      if(lives<=0){gameOver();return;}
+      z.alive=false;scene.remove(z.mesh);lives=Math.max(0,lives-1);updateHUD();screenShake();playHit();
+      if(target===z)setTarget(getClosest());if(lives<=0){gameOver();return;}
     }
   }
-
-  updateBullets();
-  updateItems(elapsed);
+  updateBullets();updateItems(elapsed);
   if(!target||!target.alive)setTarget(getClosest()||items.find(it=>it.alive)||null);
-
   if(spawnsLeft===0&&zombies.filter(z=>z.alive).length===0&&!waveClearing){
     waveClearing=true;
-    setTimeout(()=>{
-      wave++;
-      // エンドレス: victoryなし、次のウェーブへ
-      items.forEach(it=>scene.remove(it.mesh));items=[];
-      zombies=[];target=null;updateHUD();beginWave();
-    },1500);
+    setTimeout(()=>{wave++;items.forEach(it=>scene.remove(it.mesh));items=[];zombies=[];target=null;updateHUD();beginWave();},1500);
   }
-
-  updateLabels();
-  renderer.render(scene,camera);
+  updateLabels();renderer.render(scene,camera);
 }
 
 // ─── INPUT ───
 document.getElementById('ti').addEventListener('keydown',function(e){
   if(!running)return;
-
-  // TAB → toggle reload mode
-  if(e.key==='Tab'){
-    e.preventDefault();
-    if(reloadMode){exitReloadMode();}
-    else{enterReloadMode();}
-    return;
-  }
-
-  // Block backspace always
+  if(e.key==='Tab'){e.preventDefault();if(reloadMode){exitReloadMode();}else{enterReloadMode();}return;}
   if(e.key==='Backspace'){e.preventDefault();return;}
 });
 
@@ -1669,133 +1206,73 @@ document.getElementById('ti').addEventListener('input',function(){
 
   // ── RELOAD MODE ──
   if(reloadMode){
-    const val=this.value.toLowerCase();
-    const expected='reload';
-    const iw=document.getElementById('input-wrap');
-
-    // check character by character
+    const val=this.value.toLowerCase();const expected='reload';const iw=document.getElementById('input-wrap');
     if(val.length<=expected.length&&expected.startsWith(val)){
-      // correct so far
-      reloadTyped=val;
-      iw.classList.remove('err-mode');
-      this.value=val;
-      if(val===expected){
-        // fully typed "reload"!
-        this.value='';
-        reloadTyped='';
-        doReload();
-      }
-    } else {
-      // wrong key
-      iw.classList.add('err-mode');
-      setTimeout(()=>iw.classList.remove('err-mode'),180);
-      this.value=reloadTyped;
+      reloadTyped=val;iw.classList.remove('err-mode');this.value=val;
+      if(val===expected){this.value='';reloadTyped='';doReload();}
+    }else{
+      iw.classList.add('err-mode');setTimeout(()=>iw.classList.remove('err-mode'),180);this.value=reloadTyped;
     }
     return;
   }
 
   // ── FIRE MODE ──
-  // アイテムもターゲット候補に
-  if(!target||(!target.alive&&!target.isItem)){
-    setTarget(getClosest()||items.find(it=>it.alive)||null);
-    if(!target)return;
-  }
-  if(target.isItem&&!target.alive){
-    setTarget(getClosest()||items.find(it=>it.alive)||null);
-    if(!target)return;
-  }
-  const val=this.value;
-  const last=val[val.length-1];
-  if(!last)return;
+  if(!target||(!target.alive&&!target.isItem)){setTarget(getClosest()||items.find(it=>it.alive)||null);if(!target)return;}
+  if(target.isItem&&!target.alive){setTarget(getClosest()||items.find(it=>it.alive)||null);if(!target)return;}
+  const val=this.value;const last=val[val.length-1];if(!last)return;
 
   // アイテムへのタイピング（弾不要）
   if(target.isItem){
-    const iw=document.getElementById('input-wrap');
-    const expected=target.word[target.typed.length];
+    const iw=document.getElementById('input-wrap');const expected=target.word[target.typed.length];
     if(last===expected){
-      target.typed+=last;
-      iw.classList.remove('err-mode');
-      this.value=target.typed;
+      target.typed+=last;iw.classList.remove('err-mode');this.value=target.typed;
       if(target.typed===target.word){
-        // 回復！
-        target.alive=false;scene.remove(target.mesh);
-        lives=Math.min(3,lives+1);updateHUD();
-        playHeal();
-        showBanner('♥ +1 LIFE ♥');
-        const rf=document.getElementById('reload-flash');
-        rf.style.background='rgba(255,50,100,0.18)';
-        setTimeout(()=>rf.style.background='rgba(255,140,0,0)',400);
-        const idx=items.indexOf(target);
-        if(idx>=0)items.splice(idx,1);
-        setTarget(getClosest());
+        target.alive=false;scene.remove(target.mesh);lives=Math.min(3,lives+1);updateHUD();playHeal();showBanner('♥ +1 LIFE ♥');
+        const rf=document.getElementById('reload-flash');rf.style.background='rgba(255,50,100,0.18)';setTimeout(()=>rf.style.background='rgba(255,140,0,0)',400);
+        const idx=items.indexOf(target);if(idx>=0)items.splice(idx,1);setTarget(getClosest());
       }
-    } else {
-      iw.classList.add('err-mode');
-      setTimeout(()=>iw.classList.remove('err-mode'),180);
-      this.value=target.typed;
-    }
+    }else{iw.classList.add('err-mode');setTimeout(()=>iw.classList.remove('err-mode'),180);this.value=target.typed;}
     return;
   }
 
+  // ── 弾切れチェック（自動リロードモード移行なし） ──
   if(ammo<=0){
     this.value=target.typed;
     playEmpty();
-    enterReloadMode();
+    // 弾切れ警告表示のみ — TABを自分で押してリロードしてもらう
+    updateAmmoUI();
     return;
   }
 
-  const expected=target.word[target.typed.length];
-  const iw=document.getElementById('input-wrap');
+  const expected=target.word[target.typed.length];const iw=document.getElementById('input-wrap');
   if(last===expected){
-    target.typed+=last;
-    iw.classList.remove('err-mode');
-    this.value=target.typed;
-    playGunshot();
-    muzzleFlash();
+    target.typed+=last;iw.classList.remove('err-mode');this.value=target.typed;
+    playGunshot();muzzleFlash();
+
+    ammo--;updateAmmoUI();
     fireBullet(target);
+
     if(target.typed===target.word){
-      const fl=new THREE.PointLight(0xffaa00,5,7);
-      fl.position.copy(target.mesh.position);fl.position.y=1;
-      scene.add(fl);setTimeout(()=>scene.remove(fl),280);
-      target.alive=false;scene.remove(target.mesh);
-      score+=target.word.length*10*wave;updateHUD();
-      setTarget(getClosest());
+      const fl=new THREE.PointLight(0xffaa00,5,7);fl.position.copy(target.mesh.position);fl.position.y=1;scene.add(fl);setTimeout(()=>scene.remove(fl),280);
+      target.alive=false;scene.remove(target.mesh);score+=target.word.length*10*wave;updateHUD();setTarget(getClosest());
     }
-  } else {
-    iw.classList.add('err-mode');
-    setTimeout(()=>iw.classList.remove('err-mode'),180);
-    this.value=target.typed;
-  }
+  }else{iw.classList.add('err-mode');setTimeout(()=>iw.classList.remove('err-mode'),180);this.value=target.typed;}
 });
 
 function gameOver(){
-  running=false;
-  paused=false;
-  document.getElementById('pause-btn').classList.add('hidden');
-  document.getElementById('pause-menu').style.display='none';
-  stopBGM();
-  document.getElementById('labels').innerHTML='';
-  const o=document.getElementById('ov');
-  o.className='gameover';o.style.display='flex';
+  running=false;paused=false;
+  document.getElementById('pause-btn').classList.add('hidden');document.getElementById('pause-menu').style.display='none';
+  stopBGM();document.getElementById('labels').innerHTML='';
+  const o=document.getElementById('ov');o.className='gameover';o.style.display='flex';
   o.innerHTML=`<h1>GAME<br>OVER</h1><p>ゾンビに食われた...</p><div class="sc">SCORE: ${String(score).padStart(6,'0')}</div><p style="color:#5a2a2a;font-family:'Press Start 2P',monospace;font-size:8px">WAVE ${wave} まで到達</p><button onclick="startGame()">▶ RETRY</button>`;
-  // ランキング登録フロー
   setTimeout(()=>showNameModal(score,wave),600);
 }
-function victory(){
-  running=false;
-  stopBGM();
-  document.getElementById('labels').innerHTML='';
-  const o=document.getElementById('ov');
-  o.className='';o.style.display='flex';
-  o.innerHTML=`<h1>MISSION<br>COMPLETE</h1><p>全ゾンビ撃退！</p><div class="sc">SCORE: ${String(score).padStart(6,'0')}</div><button onclick="startGame()">▶ PLAY AGAIN</button>`;
-  setTimeout(()=>showNameModal(score,wave),600);
-}
-
 
 // ─── SUPABASE CONFIG ───
-// ★ここにあなたのSupabase URLとanon keyを入れてください★
+// ★ SupabaseダッシュボードのProject Settings > API から
+//   「anon public」キー（eyJ...で始まるJWT）をコピーしてください ★
 const SUPABASE_URL = 'https://ojlmeetytazclmhandjh.supabase.co';
-const SUPABASE_ANON_KEY = 'sb_publishable_7FbDZKNdKCZ9HW9xMwRNyA_Vn-8kHC2';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9qbG1lZXR5dGF6Y2xtaGFuZGpoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcwMTQyNTUsImV4cCI6MjA5MjU5MDI1NX0.T-9D8b92LFX1CCP-7pecHU9LgYCIObzcupFsossAB6g';
 
 const SUPABASE_HEADERS = {
   'Content-Type': 'application/json',
@@ -1805,123 +1282,66 @@ const SUPABASE_HEADERS = {
 };
 
 // ─── RANKING STATE ───
-let currentTab='all';
-let pendingScore=null;
-let pendingWave=null;
+let currentTab='all';let pendingScore=null;let pendingWave=null;
 let savedPlayerName=localStorage.getItem('zombie_player_name')||'';
 
-// ─── SUPABASE API ───
 function getBrowserId(){
   let id=localStorage.getItem('zombie_browser_id');
-  if(!id){id=crypto.randomUUID();localStorage.setItem('zombie_browser_id',id);}
-  return id;
+  if(!id){id=crypto.randomUUID();localStorage.setItem('zombie_browser_id',id);}return id;
 }
 
 async function fetchRanking(period){
   let url=SUPABASE_URL+'/rest/v1/scores?select=*&order=score.desc&limit=20';
   const now=new Date();
-  if(period==='weekly'){
-    const w=new Date(now);w.setDate(w.getDate()-7);
-    url+=`&created_at=gte.${w.toISOString()}`;
-  } else if(period==='monthly'){
-    const m=new Date(now);m.setMonth(m.getMonth()-1);
-    url+=`&created_at=gte.${m.toISOString()}`;
-  }
-  try{
-    const res=await fetch(url,{headers:SUPABASE_HEADERS});
-    if(!res.ok)throw new Error('fetch error');
-    return await res.json();
-  }catch(e){return null;}
+  if(period==='weekly'){const w=new Date(now);w.setDate(w.getDate()-7);url+=`&created_at=gte.${w.toISOString()}`;}
+  else if(period==='monthly'){const m=new Date(now);m.setMonth(m.getMonth()-1);url+=`&created_at=gte.${m.toISOString()}`;}
+  try{const res=await fetch(url,{headers:SUPABASE_HEADERS});if(!res.ok)throw new Error('fetch error '+res.status);return await res.json();}
+  catch(e){console.error('fetchRanking error:',e);return null;}
 }
 
 async function postScore(name,sc,wv){
   const browserId=getBrowserId();
   try{
-    // まず既存スコアを確認
-    const checkRes=await fetch(
-      SUPABASE_URL+'/rest/v1/scores?browser_id=eq.'+browserId+'&select=score',
-      {headers:SUPABASE_HEADERS}
-    );
+    const checkRes=await fetch(SUPABASE_URL+'/rest/v1/scores?browser_id=eq.'+browserId+'&select=score',{headers:SUPABASE_HEADERS});
     if(checkRes.ok){
       const existing=await checkRes.json();
       if(existing.length>0){
-        if(existing[0].score>=sc) return 'lower'; // 既存の方が高い
-        // UPDATEで上書き
-        const upRes=await fetch(
-          SUPABASE_URL+'/rest/v1/scores?browser_id=eq.'+browserId,
-          {
-            method:'PATCH',
-            headers:SUPABASE_HEADERS,
-            body:JSON.stringify({player_name:name,score:sc,wave:wv})
-          }
-        );
+        if(existing[0].score>=sc)return 'lower';
+        const upRes=await fetch(SUPABASE_URL+'/rest/v1/scores?browser_id=eq.'+browserId,{method:'PATCH',headers:SUPABASE_HEADERS,body:JSON.stringify({player_name:name,score:sc,wave:wv})});
         return upRes.ok?'ok':'error';
       }
     }
-    // 新規INSERT
-    const insRes=await fetch(SUPABASE_URL+'/rest/v1/scores',{
-      method:'POST',
-      headers:SUPABASE_HEADERS,
-      body:JSON.stringify({browser_id:browserId,player_name:name,score:sc,wave:wv})
-    });
+    const insRes=await fetch(SUPABASE_URL+'/rest/v1/scores',{method:'POST',headers:SUPABASE_HEADERS,body:JSON.stringify({browser_id:browserId,player_name:name,score:sc,wave:wv})});
     return insRes.ok?'ok':'error';
-  }catch(e){return 'error';}
+  }catch(e){console.error('postScore error:',e);return 'error';}
 }
 
-// ─── RANKING UI ───
 function switchTab(tab){
-  currentTab=tab;
-  document.querySelectorAll('.rank-tab').forEach(t=>t.classList.remove('active'));
-  const idx={all:0,monthly:1,weekly:2}[tab];
-  document.querySelectorAll('.rank-tab')[idx].classList.add('active');
-  loadRanking(tab);
+  currentTab=tab;document.querySelectorAll('.rank-tab').forEach(t=>t.classList.remove('active'));
+  const idx={all:0,monthly:1,weekly:2}[tab];document.querySelectorAll('.rank-tab')[idx].classList.add('active');loadRanking(tab);
 }
 
 async function loadRanking(period){
-  const tbody=document.getElementById('rank-body');
-  const status=document.getElementById('rank-status');
-  tbody.innerHTML='<tr><td colspan="5" style="text-align:center;color:#2a5a2a;padding:20px">Loading...</td></tr>';
-  status.textContent='';
-
-  if(SUPABASE_URL.includes('YOUR_PROJECT')){
-    tbody.innerHTML='<tr><td colspan="5" style="text-align:center;color:#5a3a2a;padding:20px">⚠ Supabase未設定<br><span style="font-size:11px;color:#3a2a1a">SUPABASE_URL / ANON_KEYを設定してください</span></td></tr>';
-    return;
+  const tbody=document.getElementById('rank-body');const status=document.getElementById('rank-status');
+  tbody.innerHTML='<tr><td colspan="5" style="text-align:center;color:#2a5a2a;padding:20px">Loading...</td></tr>';status.textContent='';
+  if(SUPABASE_ANON_KEY.startsWith('ここに')||SUPABASE_ANON_KEY.startsWith('sb_')){
+    tbody.innerHTML='<tr><td colspan="5" style="text-align:center;color:#5a3a2a;padding:16px">⚠ Supabase APIキー未設定<br><span style="font-size:11px;color:#3a2a1a">HTMLファイルのSUPABASE_ANON_KEYに<br>eyJ...で始まるJWTキーを貼り付けてください</span></td></tr>';return;
   }
-
   const rows=await fetchRanking(period);
-  if(!rows){
-    tbody.innerHTML='<tr><td colspan="5" style="text-align:center;color:#5a3a2a;padding:20px">接続エラー</td></tr>';
-    return;
-  }
-  if(rows.length===0){
-    tbody.innerHTML='<tr><td colspan="5" style="text-align:center;color:#2a5a2a;padding:20px">まだスコアなし — 最初のチャンピオンになれ！</td></tr>';
-    return;
-  }
-
+  if(!rows){tbody.innerHTML='<tr><td colspan="5" style="text-align:center;color:#5a3a2a;padding:20px">接続エラー — コンソールを確認</td></tr>';return;}
+  if(rows.length===0){tbody.innerHTML='<tr><td colspan="5" style="text-align:center;color:#2a5a2a;padding:20px">まだスコアなし — 最初のチャンピオンになれ！</td></tr>';return;}
   const medals=['🥇','🥈','🥉'];
   tbody.innerHTML=rows.map((r,i)=>{
     const isMe=r.player_name===savedPlayerName&&savedPlayerName!=='';
     const rank=i<3?`<span class="rank-medal">${medals[i]}</span>`:`<b>#${i+1}</b>`;
     const date=new Date(r.created_at).toLocaleDateString('ja-JP',{month:'2-digit',day:'2-digit'});
-    return `<tr${isMe?' class="me"':''}>
-      <td>${rank}</td>
-      <td>${r.player_name||'???'}</td>
-      <td><b>${String(r.score).padStart(6,'0')}</b></td>
-      <td>WAVE ${r.wave}</td>
-      <td>${date}</td>
-    </tr>`;
+    return `<tr${isMe?' class="me"':''}><td>${rank}</td><td>${r.player_name||'???'}</td><td><b>${String(r.score).padStart(6,'0')}</b></td><td>WAVE ${r.wave}</td><td>${date}</td></tr>`;
   }).join('');
 }
 
-function openRanking(){
-  document.getElementById('ranking-panel').style.display='flex';
-  loadRanking(currentTab);
-}
-function closeRanking(){
-  document.getElementById('ranking-panel').style.display='none';
-}
+function openRanking(){document.getElementById('ranking-panel').style.display='flex';loadRanking(currentTab);}
+function closeRanking(){document.getElementById('ranking-panel').style.display='none';}
 
-// ─── SCORE SUBMISSION ───
 function showNameModal(sc,wv){
   pendingScore=sc;pendingWave=wv;
   document.getElementById('nm-score').textContent='SCORE: '+String(sc).padStart(6,'0')+' / WAVE '+wv;
@@ -1931,50 +1351,30 @@ function showNameModal(sc,wv){
 }
 
 async function submitScore(){
-  const nameEl=document.getElementById('player-name-input');
-  const name=nameEl.value.trim().slice(0,12)||'UNKNOWN';
-  savedPlayerName=name;
-  localStorage.setItem('zombie_player_name',name);
+  const nameEl=document.getElementById('player-name-input');const name=nameEl.value.trim().slice(0,12)||'UNKNOWN';
+  savedPlayerName=name;localStorage.setItem('zombie_player_name',name);
   document.getElementById('name-modal').style.display='none';
   const result=await postScore(name,pendingScore,pendingWave);
   pendingScore=null;pendingWave=null;
   if(result==='ok')showGameOverWithRanking('✦ 登録完了！ ✦');
   else if(result==='lower')showGameOverWithRanking('⚠ 自己ベスト未更新');
-  else showGameOverWithRanking('⚠ 登録失敗（接続確認）');
+  else showGameOverWithRanking('⚠ 登録失敗 — APIキーを確認してください');
 }
 
-function skipRanking(){
-  document.getElementById('name-modal').style.display='none';
-  pendingScore=null;pendingWave=null;
-}
+function skipRanking(){document.getElementById('name-modal').style.display='none';pendingScore=null;pendingWave=null;}
 
 function showGameOverWithRanking(msg){
-  // ランキングボタンをoverlayに追加
   const o=document.getElementById('ov');
-  if(!o.querySelector('#rank-btn')){
-    const btn=document.createElement('button');
-    btn.id='rank-btn';
-    btn.textContent='🏆 RANKING';
-    btn.onclick=openRanking;
-    o.appendChild(btn);
-  }
-  if(msg){
-    const p=document.createElement('p');
-    p.style.cssText='font-size:10px;color:#2aff5a;font-family:"Press Start 2P",monospace;margin-top:4px;';
-    p.textContent=msg;
-    o.appendChild(p);
-  }
+  if(!o.querySelector('#rank-btn')){const btn=document.createElement('button');btn.id='rank-btn';btn.textContent='🏆 RANKING';btn.onclick=openRanking;o.appendChild(btn);}
+  if(msg){const p=document.createElement('p');p.style.cssText='font-size:10px;color:#2aff5a;font-family:"Press Start 2P",monospace;margin-top:4px;';p.textContent=msg;o.appendChild(p);}
 }
 
-// Enterキーで名前登録
 document.addEventListener('DOMContentLoaded',()=>{
-  const ni=document.getElementById('player-name-input');
-  if(ni)ni.addEventListener('keydown',e=>{if(e.key==='Enter')submitScore();});
+  const ni=document.getElementById('player-name-input');if(ni)ni.addEventListener('keydown',e=>{if(e.key==='Enter')submitScore();});
 });
 
 // ─── BOOT ───
-init();
-renderer.render(scene,camera);
+init();renderer.render(scene,camera);
 </script>
 </body>
 </html>
