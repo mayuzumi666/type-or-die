@@ -454,10 +454,6 @@ body{background:#000;display:flex;align-items:center;justify-content:center;min-
       <div class="lbl">WAVE</div>
       <div class="val" id="wv">1</div>
     </div>
-    <div id="hud-ammo">
-      <div class="lbl">AMMO</div>
-      <div class="val" id="av">■■■■■■■■■■</div>
-    </div>
     <div id="bgm-vol-wrap">
       <div class="lbl">♪ BGM</div>
       <input id="bgm-slider" type="range" min="0" max="100" value="50" oninput="setBGMVolume(this.value)">
@@ -1295,11 +1291,6 @@ function updateBullets(){
 
 // ─── AMMO UI ───
 function updateAmmoUI(){
-  // top-right pip display
-  const av=document.getElementById('av');
-  av.textContent='■'.repeat(ammo)+'□'.repeat(MAX_AMMO-ammo);
-  av.style.color=ammo<=2?'#ff3333':ammo<=4?'#ffcc00':'#ff8c00';
-
   // weapon bar pips
   const bar=document.getElementById('ammo-bar');
   bar.innerHTML='';
